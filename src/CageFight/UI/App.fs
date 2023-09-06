@@ -19,12 +19,28 @@ module App =
     type Page =
         | Home
         | Generate of Chargen.View.Model
-    type Model = { error: string option }
-    type Msg = ClearError | GoHome | Error of string
-    let init initialCmd =
-        { error = None }, Cmd.batch initialCmd
+    type Opposition =
+        | Calibrate of string option * int option * int option
+        | Specific of (int * string) list
+    type FightSetup = {
+        sideA: (int * string) list
+        sideB: Opposition
+        }
+    type Model = { error: string option; fightSetup: FightSetup }
+    type Msg =
+        | ClearError | GoHome | Error of string
+        | ChangeFight of (FightSetup -> FightSetup)
     let update msg model =
-        model, Cmd.Empty
+        match msg with
+        | ChangeFight f -> { model with fightSetup = f model.fightSetup }, Cmd.Empty
+        | _ ->
+            model, Cmd.Empty
+    let init () =
+        let fight = {
+            sideA = [3, "Peshkali"; 1, "Galdurnaut"]
+            sideB = Calibrate(Some "Orc", None, None)
+            }
+        { error = None; fightSetup = fight }, Cmd.Empty
 
     let view (model: Model) dispatch =
         let class' (className: string) element (children: ReactElement list) =
@@ -60,25 +76,62 @@ module App =
                             class' "specificQuantity" Html.div [
                                 Html.input [prop.placeholder "Filter"]
                                 Html.div [
-                                    Html.button [prop.text "+"]
-                                    Html.button [prop.text "-"]
-                                    Html.text "3 peshkalis"
+                                    for quantity, name in model.fightSetup.sideA do
+                                        let changeQuantity delta (f: FightSetup) =
+                                            { f with sideA = f.sideA |> List.map (function (quantity, name') when name = name' -> (quantity + delta |> max 1, name) | otherwise -> otherwise) }
+                                        Html.div [
+                                            Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity +1)))]
+                                            Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity -1)))]
+                                            Html.text $"{quantity} {name}s"
+                                            ]
                                     ]
                                 ]
                             Html.text "vs."
                             class' "calibrated" Html.div [
-                                Html.input [prop.placeholder "Filter"]
-                                Html.div [
-                                    Html.button [prop.text "+"]
-                                    Html.button [prop.text "-"]
-                                    Html.text "N orcs"
-                                    class' "calibrationRange" Html.span [
-                                        Html.input [prop.type'.number; prop.placeholder "50"]
-                                        Html.text "% to "
-                                        Html.input [prop.type'.number; prop.placeholder "80"]
-                                        Html.text "%"
+                                let wrapInDiv (element: ReactElement) = Html.div [element]
+                                let onClick msg =
+                                    prop.onClick (fun _ -> dispatch (ChangeFight msg))
+                                let changeMode fight =
+                                    { fight
+                                        with
+                                        sideB =
+                                            match fight.sideB with
+                                            | Specific ((quantity, name)::_) -> Calibrate(Some name, None, None)
+                                            | Specific _ -> Calibrate(None, None, None)
+                                            | Calibrate(Some name, _, _) -> Specific [1, name]
+                                            | _ -> Specific []
+                                        }
+                                match model.fightSetup.sideB with
+                                | Specific sideB ->
+                                    Html.button [prop.text "Specific number"; onClick changeMode]
+                                        |> wrapInDiv
+                                    for quantity, name in sideB do
+                                        let changeQuantity delta (f: FightSetup) =
+                                            let changeSideB = function
+                                                | Specific lst ->
+                                                    lst
+                                                    |> List.map (function (quantity, name') when name = name' -> (quantity + delta |> max 1, name) | otherwise -> otherwise)
+                                                    |> Specific
+                                                | otherwise -> otherwise
+                                            { f with sideB = f.sideB |> changeSideB }
+                                        Html.div [
+                                            Html.button [prop.text "+"; onClick (changeQuantity +1)]
+                                            Html.button [prop.text "-"; onClick (changeQuantity -1)]
+                                            Html.text $"{quantity} {name}s"
+                                            ]
+                                | Calibrate(name, min, max) ->
+                                    Html.button [prop.text "Find optimal quantity"; onClick changeMode]
+                                        |> wrapInDiv
+                                    Html.input [prop.placeholder "Filter"]
+                                    Html.div [
+                                        Html.text $"N {name}s should lose"
+                                        class' "calibrationRange" Html.span [
+                                            Html.input [prop.type'.number; prop.placeholder (defaultArg min 50 |> toString); match min with Some min -> prop.valueOrDefault min | None -> ()]
+                                            Html.text "% to "
+                                            Html.input [prop.type'.number; prop.placeholder (defaultArg min 80 |> toString); match max with Some max -> prop.valueOrDefault max | None -> ()]
+                                            Html.text "% of the time"
+                                            ]
                                         ]
-                                    ]
                                 ]
                             Html.button [prop.text "Execute"]
                             ]
@@ -139,7 +192,7 @@ module Url =
     let parse loc =
         // let parsed = Parse.page loc
         // parsed |> List.map Cmd.ofMsg
-        [] // this goes to init ([])
+        () // this goes to init ()
     let update msg model = // update via URL navigation (from parse output), as opposed to directly via dispatch
         model, Cmd.Empty
 

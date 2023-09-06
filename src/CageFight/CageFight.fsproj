@@ -3,27 +3,6 @@
         <TargetFramework>net7.0</TargetFramework>
     </PropertyGroup>
     <ItemGroup>
-        <None Include="scratch\CQRS.fsx" />
-        <None Include="scratch\CalcVariables.fsx" />
-        <None Include="scratch\Constructor.fsx" />
-        <None Include="scratch\DFRPGChargen.fsx" />
-        <None Include="Scratch\NameMaker.fsx" />
-        <None Include="Scratch\Encounters.fsx" />
-        <None Include="Scratch\CommandGestures.fsx" />
-        <None Include="scratch\Scratch.fsx" />
-        <None Include="Scratch\XPTracking.fsx" />
-        <None Include="Scratch\ScenarioScratch.fsx" />
-        <None Include="Scratch\Script1.fsx" />
-        <None Include="Scratch\Script2.fsx" />
-        <None Include="Scratch\Script3.fsx" />
-        <None Include="Scratch\HOASExpressions.fsx" />
-        <None Include="Scratch\GameLoop.fsx" />
-        <None Include="Scratch\RibbitFromScratch.fsx" />
-        <None Include="Scratch\RibbitFromScratch2.fsx" />
-        <None Include="Scratch\RibbitFromScratch3.fsx" />
-        <None Include="Scratch\RibbitFromScratch4.fs" />
-        <None Include="Scratch\Sample.rbt" />
-        <None Include="Scripts\Scratch.fsx" />
         <Compile Include="Core\Common.fs" />
         <Compile Include="Core\CQRS.fs" />
         <Compile Include="Core\Optics.fs" />
