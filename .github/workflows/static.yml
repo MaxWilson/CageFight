@@ -32,7 +32,7 @@ jobs:
           npm ci --prefix src
       - name: Build web app
         run: |
-          npm run build --prefix src
+          npm run buildGithub --prefix src
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
