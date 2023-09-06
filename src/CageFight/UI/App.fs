@@ -19,33 +19,78 @@ module App =
     type Page =
         | Home
         | Generate of Chargen.View.Model
-    type Model = { current: Page; currentUrl: string option; error: string option; roster: CharacterSheet array; graveyard: CharacterSheet array }
+    type Model = { error: string option }
     type Msg = ClearError | GoHome | Error of string
     let init initialCmd =
-        { current = Page.Home; currentUrl = None; error = None; roster = LocalStorage.PCs.read(); graveyard = LocalStorage.Graveyard.read() }, Cmd.batch initialCmd
+        { error = None }, Cmd.batch initialCmd
     let update msg model =
         model, Cmd.Empty
 
     let view (model: Model) dispatch =
-        let class' element (className: string) (children: ReactElement list) =
+        let class' (className: string) element (children: ReactElement list) =
             element [prop.className className; prop.children children]
+        let classP' (className: string) element (props: IReactProperty list) =
+            element (prop.className className::props)
 
-        match model.current with
-        | _ when model.error.IsSome ->
-            class' Html.div "errorMsg" [
-                Html.div [Html.text model.error.Value]
+        match model.error with
+        | Some error ->
+            class' "errorMsg" Html.div [
+                Html.div [Html.text error]
                 Html.button [prop.text "OK"; prop.onClick (thunk1 dispatch ClearError)]
                 Html.button [prop.text "Start over"; prop.onClick (thunk1 dispatch GoHome)]
                 ]
-        | _ ->
+        | None ->
             Html.div [
                 prop.className "homePage"
                 prop.children [
-                    Html.div "Shining Sword Cage Fight!"
                     Html.div [
-                        prop.className "footer"
-                        prop.children [
-                            Html.a [prop.href "https://www.flaticon.com/free-icons/sword"; prop.text "Sword icon created by pongsakornRed - Flaticon"]
+                        Html.h1 "Shining Sword Cage Fight!"
+                        Html.h3 "For Dungeon Fantasy RPG and GURPS"
+                        ]
+                    class' "main" Html.div [
+                        classP' "commandInput" Html.form [
+                            prop.children [
+                                Html.text "Command: "
+                                Html.input [prop.placeholder "Peshkali vs. N Orcs"]
+                                Html.button [prop.text "OK"; prop.type'.submit]
+                                ]
+                            prop.onSubmit(fun e -> e.preventDefault())
+                            ]
+                        class' "fightSetup" Html.div [
+                            class' "specificQuantity" Html.div [
+                                Html.input [prop.placeholder "Filter"]
+                                Html.div [
+                                    Html.button [prop.text "+"]
+                                    Html.button [prop.text "-"]
+                                    Html.text "3 peshkalis"
+                                    ]
+                                ]
+                            Html.text "vs."
+                            class' "calibrated" Html.div [
+                                Html.input [prop.placeholder "Filter"]
+                                Html.div [
+                                    Html.button [prop.text "+"]
+                                    Html.button [prop.text "-"]
+                                    Html.text "N orcs"
+                                    class' "calibrationRange" Html.span [
+                                        Html.input [prop.type'.number; prop.placeholder "50"]
+                                        Html.text "% to "
+                                        Html.input [prop.type'.number; prop.placeholder "80"]
+                                        Html.text "%"
+                                        ]
+                                    ]
+                                ]
+                            Html.button [prop.text "Execute"]
+                            ]
+                        class' "statistics" Html.div [
+                            Html.div "3 peshkalis wins 50-80% of the time against 14-17 orcs"
+                            ]
+                        class' "fightLog" Html.div [
+                            Html.div "Peshkali hits orc 1, blahblahblah"
+                            Html.button [prop.text "<<"]
+                            Html.button [prop.text "<"]
+                            Html.button [prop.text ">"]
+                            Html.button [prop.text ">>"]
                             ]
                         ]
                     ]

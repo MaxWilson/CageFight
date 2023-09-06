@@ -6,7 +6,6 @@
 *
     margin: 0
     padding: 0
-    font: inherit
 
 html
     color-scheme: dark light
@@ -18,98 +17,27 @@ img, picture, svg, video
     display: block
     max-width: 100%
 
-// ShiningSword-specific logic here
+// CageFight-specific logic here
 
 body
     padding: 5px
 
-.title
-    font-weight: bold
-    font-size: 1.6rem
-
-.subtitle
-    font-weight: bold
-    font-size: 1.2rem
-
-.footnote
-    font-size: 0.7rem
-    font-style: italic
-    margin-left: 1rem
-    vertical-align: top
-
-.visualGroup
-    min-height: 1.1rem
-
-.gridContainer
-    display: grid
-    grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr))
-
-input[type=checkbox]
-    padding: 3px 3px 3px 4px
-
-button, input[type=checkbox]
-    min-width: 1.5rem
-
-.character
-    .header
-        display: flex
-        fieldset.reroll
-            display: inline-block
-            flex: 1
-            margin-left: auto
-            margin-right: auto
-    .selection
-        display: grid
-        grid-template-columns: repeat(auto-fill, minmax(100px, auto))
-        column-gap: 0.875rem
-        user-select: none
-        legend
-            grid-column: 1/-1
-    .traitview
-        user-select: none
-        .aggregate
-            padding: 0.5rem
-            margin-bottom: 0.5rem
-            .aggregate
-                columns: 2 250px
-                column-rule: 1px solid #ccc
-        .activeChoice
-            display: inline-block
-        .potentialChoice,.activeChoice
-            button
-                font-size: 0.8rem
-                margin: -2px 2px // don't want vertical margin to make the row wiggle when button appears
-            .potentialChoice
-                padding-left: 1rem
-            .subchoice
-                padding-left: 1rem
-
-.vertFlex
-    display: inline-flex
-    flex-direction: column
-    min-height: 100%
-    max-height: 100%
-
-.placeholder
-    border: thin solid red
-
-fieldset
-    padding: 4px
-    legend
-        font-size: 1.1rem
-        font-weight: bold
-        padding: 0 0.3rem
-
-table.statsTable
-    border: 1px solid black
-    th, td
-        border: 1px solid #1111
-        padding: 0.1rem 0.3rem
-    .teamFriendly
-        background-color: lightGreen
-        .name
-            font-weight: bold
-    .teamHostile
-        background-color: lightPink
-        .name
-            font-weight: bold
+.main
+    .commandInput
+    .fightSetup, .fightLog, .statistics, .commandInput
+        margin-top: 5px
+    .fightSetup, .fightLog
+        border: thin solid black
+        padding: 3px
+        button, input
+           margin-right: 3px
+           margin-top: 3px
+        .specificQuantity, .calibrated
+            margin: 3px
+            padding: 3px
+            border: 4px dashed lightgrey
+    .calibrationRange
+        input
+            padding: 0
+            box-sizing: content-box
+            max-width: 3em
