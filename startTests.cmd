@@ -1,1 +1,1 @@
-%~dp0\ShiningSword.UnitTests\startTests.cmd
+dotnet watch run --project ShiningSword.UnitTests
