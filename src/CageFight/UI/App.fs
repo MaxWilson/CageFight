@@ -60,6 +60,70 @@ module App =
                         ]
             ]
 
+    let [<ReactComponent>] editView (name: string) (db: MonsterDatabase) dispatch =
+        let stats = (db.catalog |> Map.tryFind name |> Option.defaultValue (Creature.create name))
+        let stats, update = React.useState stats
+        let editString (label:string) (hint: string) (value: string option, update: string option -> unit) =
+            Html.div [
+                Html.text label
+                Html.input [
+                    match value with
+                    | Some value ->
+                        prop.valueOrDefault value
+                    | None ->
+                        prop.placeholder hint
+                    prop.onChange (fun (txt:string) -> if String.isntWhitespace txt then update (Some txt) else update None)]
+                ]
+        let editNumber (label:string) (hint: int) (value: int option, update: int option -> unit) =
+            Html.div [
+                Html.text label
+                Html.input [
+                    match value with
+                    | Some value ->
+                        prop.valueOrDefault (value.ToString())
+                    | None ->
+                        prop.placeholder (hint.ToString())
+                    prop.type'.number
+                    prop.onChange (
+                        fun (input:string) -> (match System.Int32.TryParse input with true, n -> Some n | _ -> None) |> update)
+                    ]
+                ]
+        let editDecimalNumber (label:string) (hint: float) (value: float option, update: float option -> unit) =
+            Html.div [
+                Html.text label
+                Html.input [
+                    match value with
+                    | Some value ->
+                        prop.valueOrDefault $"%.2f{value}"
+                    | None ->
+                        prop.placeholder $"%.2f{hint}"
+                    prop.type'.number
+                    prop.onChange (
+                        fun (input:string) -> (match System.Double.TryParse input with true, n -> Some n | _ -> None) |> update)
+                    ]
+                ]
+        Html.div [
+            editString "Name" "" (Some stats.name, (fun txt -> { stats with name = defaultArg txt "" } |> update))
+            editString "Pluralized" (stats.name + "s") (stats.pluralName, (fun txt -> { stats with pluralName = txt } |> update))
+            editNumber "ST" 10 (stats.ST, (fun n -> { stats with ST = n } |> update))
+            editNumber "DX" 10 (stats.DX, (fun n -> { stats with DX = n } |> update))
+            editNumber "IQ" 10 (stats.IQ, (fun n -> { stats with IQ = n } |> update))
+            editNumber "HT" 10 (stats.HT, (fun n -> { stats with HT = n } |> update))
+            let st = defaultArg stats.ST 10
+            editNumber "HP" st (stats.HP, (fun n -> { stats with HP = n } |> update))
+            let speed = (defaultArg stats.DX 10 + defaultArg stats.HT 10 |> float) / 4.
+            // TODO: fix inability to set speed explicitly to 9.25 or other fractions
+            editDecimalNumber "Speed" speed (stats.Speed, (fun n -> { stats with Speed = n } |> update))
+            editNumber "WeaponSkill" 10 (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
+            //WeaponMaster: bool prop
+            //Damage: RollSpec prop
+            //DamageType: DamageType prop
+
+            Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
+            Html.button [prop.text "OK"]
+            ]
+
+
     let view (model: Model) dispatch =
         let class' (className: string) element (children: ReactElement list) =
             element [prop.className className; prop.children children]
@@ -73,12 +137,7 @@ module App =
                 Html.button [prop.text "OK"; prop.onClick (thunk1 dispatch ClearError)]
                 Html.button [prop.text "Start over"; prop.onClick (thunk1 dispatch (SetPage Home))]
                 ]
-        | None, Editing name ->
-            Html.div [
-                Html.input [prop.valueOrDefault name]
-                Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
-                Html.button [prop.text "OK"]
-                ]
+        | None, Editing name -> editView name model.database dispatch
         | None, Home ->
             Html.div [
                 prop.className "homePage"

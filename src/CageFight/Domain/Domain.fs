@@ -12,7 +12,7 @@ type Creature = {
     IQ: int prop
     HT: int prop
     HP: int prop
-    Speed: int prop
+    Speed: float prop
     WeaponMaster: bool prop
     WeaponSkill: int prop
     Damage: RollSpec prop
