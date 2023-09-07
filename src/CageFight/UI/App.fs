@@ -5,7 +5,8 @@ open Elmish
 open Elmish.React
 open Feliz
 open Domain
-
+open Domain.Random
+open Domain.Random.Parser
 // make sure errors are not silent: show them as Alerts (ugly but better than nothing for now)
 open Fable.Core.JsInterop
 open Fable.Core
@@ -32,6 +33,8 @@ module App =
         match msg with
         | ChangeFight f -> { model with fightSetup = f model.fightSetup }, Cmd.Empty
         | SetPage page -> { model with page = page }, Cmd.Empty
+        | Error err -> { model with error = Some err }, Cmd.Empty
+        | ClearError -> { model with error = None }, Cmd.Empty
         | _ ->
             model, Cmd.Empty
     let init () =
@@ -60,67 +63,66 @@ module App =
                         ]
             ]
 
+    let labeled (label: string) (inner: ReactElement) =
+        Html.div [
+            Html.text label
+            inner
+            ]
+    let editData<'t> (propType: IReactProperty, render: 't -> string, parser: string -> 't option) (label:string) (hint: 't) (value: 't option, update: 't option -> unit) =
+        labeled label <| Html.input [
+            match value with
+            | Some value ->
+                prop.valueOrDefault (render value)
+            | None ->
+                prop.placeholder (render hint)
+            propType
+            prop.onChange (parser >> update)
+            ]
+    let editDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:string) (hint: 't) (value: 't option, options, update: 't option -> unit) =
+        labeled label <| Html.select [
+            match value with
+            | Some value ->
+                prop.valueOrDefault (render value)
+            | None ->
+                prop.placeholder (render hint)
+            prop.children [
+                for option in options do
+                    Html.option [prop.text (render option); prop.value (render option)]
+                ]
+            prop.onChange (parser >> update)
+            ]
     let [<ReactComponent>] editView (name: string) (db: MonsterDatabase) dispatch =
         let stats = (db.catalog |> Map.tryFind name |> Option.defaultValue (Creature.create name))
         let stats, update = React.useState stats
-        let editString (label:string) (hint: string) (value: string option, update: string option -> unit) =
-            Html.div [
-                Html.text label
-                Html.input [
-                    match value with
-                    | Some value ->
-                        prop.valueOrDefault value
-                    | None ->
-                        prop.placeholder hint
-                    prop.onChange (fun (txt:string) -> if String.isntWhitespace txt then update (Some txt) else update None)]
-                ]
-        let editNumber (label:string) (hint: int) (value: int option, update: int option -> unit) =
-            Html.div [
-                Html.text label
-                Html.input [
-                    match value with
-                    | Some value ->
-                        prop.valueOrDefault (value.ToString())
-                    | None ->
-                        prop.placeholder (hint.ToString())
-                    prop.type'.number
-                    prop.onChange (
-                        fun (input:string) -> (match System.Int32.TryParse input with true, n -> Some n | _ -> None) |> update)
-                    ]
-                ]
-        let editDecimalNumber (label:string) (hint: float) (value: float option, update: float option -> unit) =
-            Html.div [
-                Html.text label
-                Html.input [
-                    match value with
-                    | Some value ->
-                        prop.valueOrDefault $"%.2f{value}"
-                    | None ->
-                        prop.placeholder $"%.2f{hint}"
-                    prop.type'.number
-                    prop.onChange (
-                        fun (input:string) -> (match System.Double.TryParse input with true, n -> Some n | _ -> None) |> update)
-                    ]
+        let editString = editData<string>(prop.type'.text, toString, (fun (txt: string) -> if String.isntWhitespace txt then Some txt else None))
+        let editNumber = editData(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
+        let editDecimalNumber = editData(prop.type'.number, (fun v -> $"%.2f{v}"), (fun (input: string) -> match System.Double.TryParse input with true, n -> Some n | _ -> None))
+        let editRollSpec = editData(prop.type'.text, toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Parser.Roll (r, Packrat.End) -> Some r | _ -> None))
+        let editDamageType = editDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
+        let editBool label (value: bool, update) =
+            labeled label <| Html.input [
+                prop.type'.checkbox
+                prop.valueOrDefault value
+                prop.onCheckedChange update
                 ]
         Html.div [
             editString "Name" "" (Some stats.name, (fun txt -> { stats with name = defaultArg txt "" } |> update))
             editString "Pluralized" (stats.name + "s") (stats.pluralName, (fun txt -> { stats with pluralName = txt } |> update))
-            editNumber "ST" 10 (stats.ST, (fun n -> { stats with ST = n } |> update))
-            editNumber "DX" 10 (stats.DX, (fun n -> { stats with DX = n } |> update))
-            editNumber "IQ" 10 (stats.IQ, (fun n -> { stats with IQ = n } |> update))
-            editNumber "HT" 10 (stats.HT, (fun n -> { stats with HT = n } |> update))
-            let st = defaultArg stats.ST 10
-            editNumber "HP" st (stats.HP, (fun n -> { stats with HP = n } |> update))
-            let speed = (defaultArg stats.DX 10 + defaultArg stats.HT 10 |> float) / 4.
+            editNumber "ST" stats.ST_ (stats.ST, (fun n -> { stats with ST = n } |> update))
+            editNumber "DX" stats.DX_ (stats.DX, (fun n -> { stats with DX = n } |> update))
+            editNumber "IQ" stats.IQ_ (stats.IQ, (fun n -> { stats with IQ = n } |> update))
+            editNumber "HT" stats.HT_ (stats.HT, (fun n -> { stats with HT = n } |> update))
+            editNumber "HP" stats.HP_ (stats.HP, (fun n -> { stats with HP = n } |> update))
             // TODO: fix inability to set speed explicitly to 9.25 or other fractions
-            editDecimalNumber "Speed" speed (stats.Speed, (fun n -> { stats with Speed = n } |> update))
-            editNumber "WeaponSkill" 10 (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
-            //WeaponMaster: bool prop
-            //Damage: RollSpec prop
-            //DamageType: DamageType prop
+            editDecimalNumber "Speed" stats.Speed_ (stats.Speed, (fun n -> { stats with Speed = n } |> update))
+            editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
+            editNumber "Weapon Skill" 10 (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
+            // TODO: fix overeager parse, e.g. 4d10 changes to 4d6 before you can finish typing the 10. Related conceptually to the speed problem above
+            editRollSpec "Damage" (RollSpec.create(1,6)) (stats.Damage, (fun dmg -> { stats with Damage = dmg } |> update))
+            editDamageType "Damage type" DamageType.Other (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Other], (fun v -> { stats with DamageType = v } |> update))
 
             Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
-            Html.button [prop.text "OK"]
+            Html.button [prop.text "OK"; prop.onClick notImpl]
             ]
 
 
@@ -323,6 +325,7 @@ Program.mkProgram init update view
     [], fun dispatch ->
             Browser.Dom.window.onerror <-
                 fun msg ->
+                    System.Diagnostics.Debugger.Break()
                     if msg.ToString().Contains "SocketProtocolError" = false then
                         dispatch (sprintf "Error: %A" msg |> Error)
                         // Browser.Dom.window.alert ("Unhandled Exception: " + msg.ToString())

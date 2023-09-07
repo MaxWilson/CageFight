@@ -80,7 +80,6 @@ module Tuple2 =
         | _ -> shouldntHappen "Tuple2.ofList: list must have exactly 2 elements"
     let toList (x,y) = [x;y]
 
-[<AutoOpen>]
 module Ctor =
     type AnonymousConstructor<'args, 'Type> = {
         create: 'args -> 'Type
