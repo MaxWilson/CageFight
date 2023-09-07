@@ -19,26 +19,31 @@ module App =
     type Opposition =
         | Calibrate of string option * int option * int option
         | Specific of (int * string) list
-    type MonsterData = Map<string, Creature>
     type FightSetup = {
         sideA: (int * string) list
         sideB: Opposition
         }
-    type Model = { error: string option; fightSetup: FightSetup }
+    type Model = { error: string option; page: Page; fightSetup: FightSetup; database : MonsterDatabase }
     type Msg =
-        | ClearError | GoHome | Error of string
+        | ClearError | Error of string
         | ChangeFight of (FightSetup -> FightSetup)
+        | SetPage of Page
     let update msg model =
         match msg with
         | ChangeFight f -> { model with fightSetup = f model.fightSetup }, Cmd.Empty
+        | SetPage page -> { model with page = page }, Cmd.Empty
         | _ ->
             model, Cmd.Empty
     let init () =
+        let db =
+            ["Peshkali"; "Orc"; "Galdurnaut"; "Skeleton"]
+            |> List.map (fun name -> Creature.create name)
+            |> List.fold (fun db monster -> MonsterDatabase.add monster db) MonsterDatabase.fresh
         let fight = {
             sideA = [3, "Peshkali"; 1, "Galdurnaut"]
             sideB = Calibrate(Some "Orc", None, None)
             }
-        { error = None; fightSetup = fight }, Cmd.Empty
+        { error = None; page = Home; fightSetup = fight; database = db }, Cmd.Empty
 
     let view (model: Model) dispatch =
         let class' (className: string) element (children: ReactElement list) =
@@ -46,14 +51,20 @@ module App =
         let classP' (className: string) element (props: IReactProperty list) =
             element (prop.className className::props)
 
-        match model.error with
-        | Some error ->
+        match model.error, model.page with
+        | Some error, _ ->
             class' "errorMsg" Html.div [
                 Html.div [Html.text error]
                 Html.button [prop.text "OK"; prop.onClick (thunk1 dispatch ClearError)]
-                Html.button [prop.text "Start over"; prop.onClick (thunk1 dispatch GoHome)]
+                Html.button [prop.text "Start over"; prop.onClick (thunk1 dispatch (SetPage Home))]
                 ]
-        | None ->
+        | None, Editing name ->
+            Html.div [
+                Html.input [prop.valueOrDefault name]
+                Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
+                Html.button [prop.text "OK"]
+                ]
+        | None, Home ->
             Html.div [
                 prop.className "homePage"
                 prop.children [
@@ -72,7 +83,7 @@ module App =
                             ]
                         class' "fightSetup" Html.div [
                             let editButton (name: string) =
-                                classP' "editButton" Html.button [prop.text "Edit"]
+                                classP' "editButton" Html.button [prop.text "Edit"; prop.onClick(fun _ -> dispatch (SetPage (Editing name)))]
                             let monsterPicker monsterDetails =
                                 Html.div [
                                     Html.input [prop.placeholder "Monster name"]
