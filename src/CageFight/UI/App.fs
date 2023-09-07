@@ -45,6 +45,21 @@ module App =
             }
         { error = None; page = Home; fightSetup = fight; database = db }, Cmd.Empty
 
+    let [<ReactComponent>] monsterPicker (db: MonsterDatabase) (monsterDetails: ReactElement) =
+        let namePrefix, update = React.useState ""
+        Html.div [
+            Html.input [prop.placeholder "Monster name"; prop.valueOrDefault namePrefix; prop.onChange update]
+            Html.button [prop.text "New"]
+            monsterDetails
+            if namePrefix.Length > 0 then
+                for name in db.catalog.Keys do
+                    if name.StartsWith(namePrefix, System.StringComparison.InvariantCultureIgnoreCase) then
+                        Html.div [
+                            Html.button [prop.text "Add"]
+                            Html.text name
+                            ]
+            ]
+
     let view (model: Model) dispatch =
         let class' (className: string) element (children: ReactElement list) =
             element [prop.className className; prop.children children]
@@ -84,12 +99,6 @@ module App =
                         class' "fightSetup" Html.div [
                             let editButton (name: string) =
                                 classP' "editButton" Html.button [prop.text "Edit"; prop.onClick(fun _ -> dispatch (SetPage (Editing name)))]
-                            let monsterPicker monsterDetails =
-                                Html.div [
-                                    Html.input [prop.placeholder "Monster name"]
-                                    Html.button [prop.text "New"]
-                                    monsterDetails
-                                    ]
                             class' "specificQuantity" Html.div [
                                 Html.div [
                                     for quantity, name in model.fightSetup.sideA do
@@ -102,7 +111,7 @@ module App =
                                             editButton name
                                             ]
                                     ]
-                                |> monsterPicker
+                                |> monsterPicker model.database
                                 ]
                             Html.text "vs."
                             class' "calibrated" Html.div [
@@ -119,7 +128,7 @@ module App =
                                             | Calibrate(Some name, _, _) -> Specific [1, name]
                                             | _ -> Specific []
                                         }
-                                monsterPicker <| React.fragment [
+                                monsterPicker model.database <| React.fragment [
                                     match model.fightSetup.sideB with
                                     | Specific sideB ->
                                         Html.button [prop.text "Specific number"; onClick changeMode]
