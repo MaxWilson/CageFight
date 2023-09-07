@@ -35,8 +35,6 @@ module App =
         | SetPage page -> { model with page = page }, Cmd.Empty
         | Error err -> { model with error = Some err }, Cmd.Empty
         | ClearError -> { model with error = None }, Cmd.Empty
-        | _ ->
-            model, Cmd.Empty
     let init () =
         let db =
             ["Peshkali"; "Orc"; "Galdurnaut"; "Skeleton"]
@@ -69,14 +67,18 @@ module App =
             inner
             ]
     let editData<'t> (propType: IReactProperty, render: 't -> string, parser: string -> 't option) (label:string) (hint: 't) (value: 't option, update: 't option -> unit) =
+        let txt, updateTxt = React.useState (match value with Some v -> render v | None -> "")
         labeled label <| Html.input [
-            match value with
-            | Some value ->
-                prop.valueOrDefault (render value)
-            | None ->
-                prop.placeholder (render hint)
+            prop.valueOrDefault txt
+            prop.placeholder (render hint)
             propType
-            prop.onChange (parser >> update)
+            prop.onChange updateTxt
+            prop.onBlur (fun _ ->
+                let v = parser txt
+                update v
+                match v with
+                | Some v -> updateTxt (render v)
+                | None -> updateTxt "")
             ]
     let editDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:string) (hint: 't) (value: 't option, options, update: 't option -> unit) =
         labeled label <| Html.select [
@@ -113,11 +115,9 @@ module App =
             editNumber "IQ" stats.IQ_ (stats.IQ, (fun n -> { stats with IQ = n } |> update))
             editNumber "HT" stats.HT_ (stats.HT, (fun n -> { stats with HT = n } |> update))
             editNumber "HP" stats.HP_ (stats.HP, (fun n -> { stats with HP = n } |> update))
-            // TODO: fix inability to set speed explicitly to 9.25 or other fractions
             editDecimalNumber "Speed" stats.Speed_ (stats.Speed, (fun n -> { stats with Speed = n } |> update))
             editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
             editNumber "Weapon Skill" 10 (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
-            // TODO: fix overeager parse, e.g. 4d10 changes to 4d6 before you can finish typing the 10. Related conceptually to the speed problem above
             editRollSpec "Damage" (RollSpec.create(1,6)) (stats.Damage, (fun dmg -> { stats with Damage = dmg } |> update))
             editDamageType "Damage type" DamageType.Other (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Other], (fun v -> { stats with DamageType = v } |> update))
 
@@ -137,7 +137,7 @@ module App =
             class' "errorMsg" Html.div [
                 Html.div [Html.text error]
                 Html.button [prop.text "OK"; prop.onClick (thunk1 dispatch ClearError)]
-                Html.button [prop.text "Start over"; prop.onClick (thunk1 dispatch (SetPage Home))]
+                Html.button [prop.text "Start over"; prop.onClick (fun _ -> dispatch ClearError; dispatch (SetPage Home))]
                 ]
         | None, Editing name -> editView name model.database dispatch
         | None, Home ->

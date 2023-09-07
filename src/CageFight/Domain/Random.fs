@@ -14,6 +14,7 @@ type RollSpec = StaticBonus of int | RollSpec of n:int * d:int * rest: RollSpec 
         let rec loop needsOperator = function
             | StaticBonus n -> if needsOperator && n >= 0 then $"+{n}" else n.ToString()
             | RollSpec(n,d,rest) ->
+                let d = if d = 6 then "" else d.ToString() // GURPS convention: 4d not 4d6
                 let prefix = if needsOperator && n >= 0 then $"+{n}d{d}" else $"{n}d{d}"
                 match rest with
                 | None | Some (StaticBonus 0) -> prefix
