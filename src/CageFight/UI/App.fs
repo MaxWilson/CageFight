@@ -4,24 +4,22 @@ open Fable.Core.JsInterop
 open Elmish
 open Elmish.React
 open Feliz
-open Konva
+open Domain
 
 // make sure errors are not silent: show them as Alerts (ugly but better than nothing for now)
 open Fable.Core.JsInterop
 open Fable.Core
-open Domain.Character.DungeonFantasy
 
 importSideEffects "../sass/main.sass"
 
 module App =
-    open Domain.Character
-    open Domain.Character.Universal
     type Page =
         | Home
-        | Generate of Chargen.View.Model
+        | Editing of name:string
     type Opposition =
         | Calibrate of string option * int option * int option
         | Specific of (int * string) list
+    type MonsterData = Map<string, Creature>
     type FightSetup = {
         sideA: (int * string) list
         sideB: Opposition
@@ -73,8 +71,15 @@ module App =
                             prop.onSubmit(fun e -> e.preventDefault())
                             ]
                         class' "fightSetup" Html.div [
+                            let editButton (name: string) =
+                                classP' "editButton" Html.button [prop.text "Edit"]
+                            let monsterPicker monsterDetails =
+                                Html.div [
+                                    Html.input [prop.placeholder "Monster name"]
+                                    Html.button [prop.text "New"]
+                                    monsterDetails
+                                    ]
                             class' "specificQuantity" Html.div [
-                                Html.input [prop.placeholder "Filter"]
                                 Html.div [
                                     for quantity, name in model.fightSetup.sideA do
                                         let changeQuantity delta (f: FightSetup) =
@@ -83,8 +88,10 @@ module App =
                                             Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity +1)))]
                                             Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity -1)))]
                                             Html.text $"{quantity} {name}s"
+                                            editButton name
                                             ]
                                     ]
+                                |> monsterPicker
                                 ]
                             Html.text "vs."
                             class' "calibrated" Html.div [
@@ -101,37 +108,44 @@ module App =
                                             | Calibrate(Some name, _, _) -> Specific [1, name]
                                             | _ -> Specific []
                                         }
-                                match model.fightSetup.sideB with
-                                | Specific sideB ->
-                                    Html.button [prop.text "Specific number"; onClick changeMode]
-                                        |> wrapInDiv
-                                    for quantity, name in sideB do
-                                        let changeQuantity delta (f: FightSetup) =
-                                            let changeSideB = function
-                                                | Specific lst ->
-                                                    lst
-                                                    |> List.map (function (quantity, name') when name = name' -> (quantity + delta |> max 1, name) | otherwise -> otherwise)
-                                                    |> Specific
-                                                | otherwise -> otherwise
-                                            { f with sideB = f.sideB |> changeSideB }
-                                        Html.div [
-                                            Html.button [prop.text "+"; onClick (changeQuantity +1)]
-                                            Html.button [prop.text "-"; onClick (changeQuantity -1)]
-                                            Html.text $"{quantity} {name}s"
-                                            ]
-                                | Calibrate(name, min, max) ->
-                                    Html.button [prop.text "Find optimal quantity"; onClick changeMode]
-                                        |> wrapInDiv
-                                    Html.input [prop.placeholder "Filter"]
-                                    Html.div [
-                                        Html.text $"N {name}s should lose"
-                                        class' "calibrationRange" Html.span [
-                                            Html.input [prop.type'.number; prop.placeholder (defaultArg min 50 |> toString); match min with Some min -> prop.valueOrDefault min | None -> ()]
-                                            Html.text "% to "
-                                            Html.input [prop.type'.number; prop.placeholder (defaultArg min 80 |> toString); match max with Some max -> prop.valueOrDefault max | None -> ()]
-                                            Html.text "% of the time"
-                                            ]
-                                        ]
+                                monsterPicker <| React.fragment [
+                                    match model.fightSetup.sideB with
+                                    | Specific sideB ->
+                                        Html.button [prop.text "Specific number"; onClick changeMode]
+                                            |> wrapInDiv
+                                        for quantity, name in sideB do
+                                            let changeQuantity delta (f: FightSetup) =
+                                                let changeSideB = function
+                                                    | Specific lst ->
+                                                        lst
+                                                        |> List.map (function (quantity, name') when name = name' -> (quantity + delta |> max 1, name) | otherwise -> otherwise)
+                                                        |> Specific
+                                                    | otherwise -> otherwise
+                                                { f with sideB = f.sideB |> changeSideB }
+                                            Html.div [
+                                                Html.button [prop.text "+"; onClick (changeQuantity +1)]
+                                                Html.button [prop.text "-"; onClick (changeQuantity -1)]
+                                                Html.text $"{quantity} {name}s"
+                                                editButton name
+                                                ]
+                                    | Calibrate(name, min, max) ->
+                                        Html.button [prop.text "Find optimal quantity"; onClick changeMode]
+                                            |> wrapInDiv
+                                        match name with
+                                        | Some name ->
+                                            Html.div [
+                                                Html.text $"N {name}s"
+                                                editButton name
+                                                Html.text "should lose"
+                                                class' "calibrationRange" Html.span [
+                                                    Html.input [prop.type'.number; prop.placeholder (defaultArg min 50 |> toString); match min with Some min -> prop.valueOrDefault min | None -> ()]
+                                                    Html.text "% to "
+                                                    Html.input [prop.type'.number; prop.placeholder (defaultArg min 80 |> toString); match max with Some max -> prop.valueOrDefault max | None -> ()]
+                                                    Html.text "% of the time"
+                                                    ]
+                                                ]
+                                        | None -> ()
+                                    ]
                                 ]
                             Html.button [prop.text "Execute"]
                             ]
@@ -150,7 +164,6 @@ module App =
                ]
 
 module Url =
-    open Chargen.View
     open App
     module Parse =
         open Browser.Types

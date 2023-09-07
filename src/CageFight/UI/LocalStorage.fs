@@ -1,7 +1,6 @@
 module UI.LocalStorage
 open Thoth.Json
 open Browser.Dom
-open Domain.Character.Universal
 
 let inline jsonParse<'t> fallback str : 't =
     match Decode.Auto.fromString str with
@@ -30,17 +29,13 @@ module Cache =
 
 open Cache
 
-module PCs =
-    let key = "PCs"
+module Stats =
+    open Domain
+    let key = "Stats"
     let cacheRead, cacheInvalidate = Cache.create()
-    let read (): CharacterSheet array =
+    let read (): Creature array =
         cacheRead (read key) Array.empty
-    let write (v: CharacterSheet array) =
+    let write (v: Creature array) =
         write key v
         cacheInvalidate()
 
-module Graveyard =
-    let key = "Graveyard"
-    let cacheRead, cacheInvalidate = Cache.create()
-    let read (): CharacterSheet array = cacheRead (read key) Array.empty
-    let write (v: CharacterSheet array) = cacheInvalidate(); write key v

@@ -17,6 +17,11 @@
         <Compile Include="UI\LocalStorage.fs" />
         <Compile Include="UI\DragDrop.fs" />
         <Compile Include="UI\Konva.fs" />
+        <Compile Include="UI\Chargen\Builders.fs" />
+        <Compile Include="UI\Chargen\DFModel.fs" />
+        <Compile Include="UI\Chargen\DFView.fs" />
+        <Compile Include="UI\ChargenUI.fs" />
+        <Compile Include="UI\UIComponents.fs" />
         <Compile Include="UI\App.fs" />
     </ItemGroup>
     <ItemGroup>

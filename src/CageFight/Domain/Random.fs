@@ -1,4 +1,4 @@
-namespace Domain.Random
+module Domain.Random
 
 type RollSpec = StaticBonus of int | RollSpec of n:int * d:int * rest: RollSpec option
     with
