@@ -45,19 +45,19 @@ module App =
             }
         { error = None; page = Home; fightSetup = fight; database = db }, Cmd.Empty
 
-    let [<ReactComponent>] monsterPicker (db: MonsterDatabase) (monsterDetails: ReactElement) =
+    let [<ReactComponent>] monsterPicker (db: MonsterDatabase) (clickLabel: string, onClick) (monsterDetails: ReactElement) =
         let namePrefix, update = React.useState ""
         Html.div [
             Html.input [prop.placeholder "Monster name"; prop.valueOrDefault namePrefix; prop.onChange update]
             Html.button [prop.text "New"]
             monsterDetails
             if namePrefix.Length > 0 then
-                for name in db.catalog.Keys do
-                    if name.StartsWith(namePrefix, System.StringComparison.InvariantCultureIgnoreCase) then
-                        Html.div [
-                            Html.button [prop.text "Add"]
-                            Html.text name
-                            ]
+                let matchingNames = db.catalog.Keys |> Seq.filter (fun name -> name.StartsWith(namePrefix, System.StringComparison.InvariantCultureIgnoreCase)) |> List.ofSeq
+                for name in matchingNames |> List.take (min 5 matchingNames.Length) do
+                    Html.div [
+                        Html.button [prop.text clickLabel; prop.onClick(fun _ -> onClick name)]
+                        Html.text name
+                        ]
             ]
 
     let view (model: Model) dispatch =
@@ -100,18 +100,30 @@ module App =
                             let editButton (name: string) =
                                 classP' "editButton" Html.button [prop.text "Edit"; prop.onClick(fun _ -> dispatch (SetPage (Editing name)))]
                             class' "specificQuantity" Html.div [
-                                Html.div [
-                                    for quantity, name in model.fightSetup.sideA do
-                                        let changeQuantity delta (f: FightSetup) =
-                                            { f with sideA = f.sideA |> List.map (function (quantity, name') when name = name' -> (quantity + delta |> max 1, name) | otherwise -> otherwise) }
-                                        Html.div [
-                                            Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity +1)))]
-                                            Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity -1)))]
-                                            Html.text $"{quantity} {name}s"
-                                            editButton name
-                                            ]
-                                    ]
-                                |> monsterPicker model.database
+                                let changeQuantity name delta (f: FightSetup) =
+                                    { f with
+                                        sideA =
+                                            f.sideA
+                                            |> List.map (function (quantity, name') when name = name' -> (quantity + delta, name) | otherwise -> otherwise)
+                                            |> List.filter (fun (quantity, _) -> quantity > 0)
+                                            }
+                                let addToSideA name fightSetup =
+                                    if fightSetup.sideA |> List.exists (fun (_, name') -> name = name') then
+                                        changeQuantity name +1 fightSetup
+                                    else
+                                        { fightSetup with
+                                            sideA = fightSetup.sideA@[1, name]
+                                            }
+                                monsterPicker model.database ("Add", addToSideA >> ChangeFight >> dispatch) <|
+                                    Html.div [
+                                        for quantity, name in model.fightSetup.sideA do
+                                            Html.div [
+                                                Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity name +1)))]
+                                                Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity name -1)))]
+                                                Html.text $"{quantity} {name}s"
+                                                editButton name
+                                                ]
+                                        ]
                                 ]
                             Html.text "vs."
                             class' "calibrated" Html.div [
@@ -128,27 +140,40 @@ module App =
                                             | Calibrate(Some name, _, _) -> Specific [1, name]
                                             | _ -> Specific []
                                         }
-                                monsterPicker model.database <| React.fragment [
-                                    match model.fightSetup.sideB with
-                                    | Specific sideB ->
+                                match model.fightSetup.sideB with
+                                | Specific sideB ->
+                                    let changeQuantity name delta (f: FightSetup) =
+                                        let changeSideB = function
+                                            | Specific lst ->
+                                                lst
+                                                |> List.map (function (quantity, name') when name = name' -> (quantity + delta |> max 1, name) | otherwise -> otherwise)
+                                                |> Specific
+                                            | otherwise -> otherwise
+                                        { f with sideB = f.sideB |> changeSideB }
+                                    let addToSideB name fightSetup =
+                                        if sideB |> List.exists (fun (_, name') -> name = name') then
+                                            changeQuantity name +1 fightSetup
+                                        else
+                                            { fightSetup with
+                                                sideB = Specific(sideB@[1, name])
+                                                }
+
+                                    monsterPicker model.database ("Add", addToSideB >> ChangeFight >> dispatch) <| React.fragment [
                                         Html.button [prop.text "Specific number"; onClick changeMode]
                                             |> wrapInDiv
                                         for quantity, name in sideB do
-                                            let changeQuantity delta (f: FightSetup) =
-                                                let changeSideB = function
-                                                    | Specific lst ->
-                                                        lst
-                                                        |> List.map (function (quantity, name') when name = name' -> (quantity + delta |> max 1, name) | otherwise -> otherwise)
-                                                        |> Specific
-                                                    | otherwise -> otherwise
-                                                { f with sideB = f.sideB |> changeSideB }
                                             Html.div [
-                                                Html.button [prop.text "+"; onClick (changeQuantity +1)]
-                                                Html.button [prop.text "-"; onClick (changeQuantity -1)]
+                                                Html.button [prop.text "+"; onClick (changeQuantity name +1)]
+                                                Html.button [prop.text "-"; onClick (changeQuantity name -1)]
                                                 Html.text $"{quantity} {name}s"
                                                 editButton name
                                                 ]
-                                    | Calibrate(name, min, max) ->
+                                        ]
+                                | Calibrate(name, min, max) ->
+                                    let setSideB name fightSetup =
+                                        { fightSetup with sideB = Calibrate(Some name, min, max)
+                                            }
+                                    monsterPicker model.database ("Set", setSideB >> ChangeFight >> dispatch) <| React.fragment [
                                         Html.button [prop.text "Find optimal quantity"; onClick changeMode]
                                             |> wrapInDiv
                                         match name with
@@ -165,7 +190,7 @@ module App =
                                                     ]
                                                 ]
                                         | None -> ()
-                                    ]
+                                        ]
                                 ]
                             Html.button [prop.text "Execute"]
                             ]
