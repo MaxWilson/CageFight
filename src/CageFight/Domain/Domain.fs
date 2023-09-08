@@ -136,3 +136,17 @@ module Parser =
     let (|Command|_|) = pack <| function
         | Str "add" (Creature(monster, rest)) -> Some((fun db -> MonsterDatabase.add monster db), rest)
         | _ -> None
+
+module Defaults =
+    open Packrat
+    let database() =
+        [
+            let parse (input: string) = match ParseArgs.Init input with | Parser.Creature(c, End) -> c | _ -> shouldntHappen input
+            parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 Skill 18 sw+1 cut"
+            parse "Orc: ST 12 DX 11 IQ 9 HT 11 HP 14 Skill 13 1d+3 cut"
+            parse "Ogre: ST 20 DX 11 IQ 7 HT 13 Skill 16 3d+7 cr"
+            parse "Slugbeast: ST 16 IQ 2 Skill 12 1d+2"
+            parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp"
+            ]
+        |> List.map(fun c -> c.name, c)
+        |> Map.ofList
