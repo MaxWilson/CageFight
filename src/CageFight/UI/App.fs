@@ -25,9 +25,11 @@ module App =
         sideB: Opposition
         }
     type Model = { error: string option; page: Page; fightSetup: FightSetup; database : MonsterDatabase }
+    type Side = SideA | SideB
     type Msg =
         | ClearError | Error of string
         | ChangeFight of (FightSetup -> FightSetup)
+        | Clear of Side
         | SetPage of Page
     let update msg model =
         match msg with
@@ -35,6 +37,11 @@ module App =
         | SetPage page -> { model with page = page }, Cmd.Empty
         | Error err -> { model with error = Some err }, Cmd.Empty
         | ClearError -> { model with error = None }, Cmd.Empty
+        | Clear side ->
+            let clearSide = function
+                | SideA -> { model.fightSetup with sideA = [] }
+                | SideB -> { model.fightSetup with sideB = Calibrate(None, None, None) }
+            { model with fightSetup = clearSide side }, Cmd.Empty
     let init () =
         let db =
             ["Peshkali"; "Orc"; "Galdurnaut"; "Skeleton"]
@@ -46,11 +53,12 @@ module App =
             }
         { error = None; page = Home; fightSetup = fight; database = db }, Cmd.Empty
 
-    let [<ReactComponent>] monsterPicker (db: MonsterDatabase) (clickLabel: string, onClick) (monsterDetails: ReactElement) =
+    let [<ReactComponent>] monsterPicker (db: MonsterDatabase) (clickLabel: string, onClick, side, dispatch) (monsterDetails: ReactElement) =
         let namePrefix, update = React.useState ""
         Html.div [
             Html.input [prop.placeholder "Monster name"; prop.valueOrDefault namePrefix; prop.onChange update]
-            Html.button [prop.text "New"]
+            classP' "newButton" Html.button [prop.text "New"; prop.onClick(thunk1 dispatch (SetPage (Editing "")))]
+            classP' "clearButton" Html.button [prop.text "Clear"; prop.onClick(thunk1 dispatch (Clear side))]
             monsterDetails
             if namePrefix.Length > 0 then
                 let matchingNames = db.catalog.Keys |> Seq.filter (fun name -> name.StartsWith(namePrefix, System.StringComparison.InvariantCultureIgnoreCase)) |> List.ofSeq
@@ -175,15 +183,18 @@ module App =
                                         { fightSetup with
                                             sideA = fightSetup.sideA@[1, name]
                                             }
-                                monsterPicker model.database ("Add", addToSideA >> ChangeFight >> dispatch) <|
+                                monsterPicker model.database ("Add", addToSideA >> ChangeFight >> dispatch, SideA, dispatch) <|
                                     Html.div [
-                                        for quantity, name in model.fightSetup.sideA do
-                                            Html.div [
-                                                Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity name +1)))]
-                                                Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity name -1)))]
-                                                Html.text $"{quantity} {name}s"
-                                                editButton name
-                                                ]
+                                        match model.fightSetup.sideA with
+                                        | [] -> Html.text "No creatures selected"
+                                        | sideA ->
+                                            for quantity, name in sideA do
+                                                Html.div [
+                                                    Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity name +1)))]
+                                                    Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity name -1)))]
+                                                    Html.text $"{quantity} {name}s"
+                                                    editButton name
+                                                    ]
                                         ]
                                 ]
                             Html.text "vs."
@@ -219,22 +230,25 @@ module App =
                                                 sideB = Specific(sideB@[1, name])
                                                 }
 
-                                    monsterPicker model.database ("Add", addToSideB >> ChangeFight >> dispatch) <| React.fragment [
+                                    monsterPicker model.database ("Add", addToSideB >> ChangeFight >> dispatch, SideB, dispatch) <| React.fragment [
                                         Html.button [prop.text "Specific number"; onClick changeMode]
                                             |> wrapInDiv
-                                        for quantity, name in sideB do
-                                            Html.div [
-                                                Html.button [prop.text "+"; onClick (changeQuantity name +1)]
-                                                Html.button [prop.text "-"; onClick (changeQuantity name -1)]
-                                                Html.text $"{quantity} {name}s"
-                                                editButton name
-                                                ]
+                                        match sideB with
+                                        | [] -> Html.text "No creatures selected"
+                                        | sideB ->
+                                            for quantity, name in sideB do
+                                                Html.div [
+                                                    Html.button [prop.text "+"; onClick (changeQuantity name +1)]
+                                                    Html.button [prop.text "-"; onClick (changeQuantity name -1)]
+                                                    Html.text $"{quantity} {name}s"
+                                                    editButton name
+                                                    ]
                                         ]
                                 | Calibrate(name, min, max) ->
                                     let setSideB name fightSetup =
                                         { fightSetup with sideB = Calibrate(Some name, min, max)
                                             }
-                                    monsterPicker model.database ("Set", setSideB >> ChangeFight >> dispatch) <| React.fragment [
+                                    monsterPicker model.database ("Set", setSideB >> ChangeFight >> dispatch, SideB, dispatch) <| React.fragment [
                                         Html.button [prop.text "Find optimal quantity"; onClick changeMode]
                                             |> wrapInDiv
                                         match name with
@@ -250,11 +264,11 @@ module App =
                                                     Html.text "% of the time"
                                                     ]
                                                 ]
-                                        | None -> ()
+                                        | None -> Html.div "No creatures selected"
                                         ]
                                 ]
-                            Html.button [prop.text "Execute"]
                             ]
+                        Html.button [prop.text "Execute"]
                         class' "statistics" Html.div [
                             Html.div "3 peshkalis wins 50-80% of the time against 14-17 orcs"
                             ]
