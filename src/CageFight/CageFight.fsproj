@@ -3,6 +3,7 @@
         <TargetFramework>net7.0</TargetFramework>
     </PropertyGroup>
     <ItemGroup>
+        <None Include="Scratch.fsx" />
         <Compile Include="Core\Common.fs" />
         <Compile Include="Core\CQRS.fs" />
         <Compile Include="Core\Optics.fs" />

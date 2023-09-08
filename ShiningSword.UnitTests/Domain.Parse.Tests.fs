@@ -1,4 +1,4 @@
-module Domain
+module Domain.Parse.Tests
 open Expecto
 
 open Packrat

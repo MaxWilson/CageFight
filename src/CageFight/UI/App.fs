@@ -112,12 +112,18 @@ module App =
             ]
     let editDamage (label:string) (stats: Creature) update =
         let value = stats.Damage
-        let render = toString
+        let render = function
+        | Explicit r -> toString r
+        | Swing 0 -> "sw"
+        | Thrust 0 -> "thr"
+        | Swing v -> $"sw%+d{v}"
+        | Thrust v -> $"thr%+d{v}"
         let txt, updateTxt = React.useState (match value with Some v -> render v | None -> $"")
-        labeled label <| React.fragment [
+        class' "editDamage" Html.div [
+            Html.text label
             Html.input [
                 prop.valueOrDefault txt
-                prop.placeholder (render stats.Damage_)
+                prop.placeholder (toString stats.Damage_)
                 prop.onChange updateTxt
                 prop.onBlur (fun _ ->
                     match Packrat.ParseArgs.Init txt with
@@ -125,7 +131,7 @@ module App =
                         let stats' =
                             { stats with Damage = Some dmg; DamageType = dtype |> Option.orElse stats.DamageType }
                         update stats'
-                        updateTxt (stats'.Damage_ |> toString)
+                        updateTxt (dmg |> render)
                     | _ ->
                         let stats' =
                             { stats with Damage = None }
@@ -133,14 +139,8 @@ module App =
                         updateTxt ""
                     )
                 ]
-            let renderDamage = function
-            | Explicit r -> toString r
-            | Swing 0 -> "sw"
-            | Thrust 0 -> "thr"
-            | Swing v -> $"sw%+d{v}"
-            | Thrust v -> $"thr%+d{v}"
             match stats.Damage with
-            | Some (Explicit _) -> () // if it's explicitly set then showing again would be redundant
+            | None | Some (Explicit _) -> () // if it's placeholdered or explicitly set then showing again would be redundant
             | _ -> Html.text $"({stats.Damage_ |> toString})"
             ]
     let [<ReactComponent>] editView (name: string) (db: MonsterDatabase) dispatch =

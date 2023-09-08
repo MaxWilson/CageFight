@@ -7,8 +7,24 @@ module Core =
     type 't prop = 't option
     type DamageType = Cutting | Impaling | Crushing | Piercing | Other
     type DamageSpec = Explicit of RollSpec | Swing of int | Thrust of int
-    let swingDamage bonusOrPenalty = RollSpec.create(1,6)
-    let thrustDamage bonusOrPenalty = RollSpec.create(1,6)
+    let swingDamage st bonusOrPenalty =
+        if st < 9 then RollSpec.create(1,6, bonusOrPenalty + (st-12)/2)
+        elif st < 28 then
+            let nDice = 1 + ((st-9) / 4)
+            let bonus = (st-9) % 4 - 1
+            RollSpec.create(nDice, 6, bonusOrPenalty + bonus)
+        else
+            notImpl "Swing damage for ST 28+"
+    for st in [1..27] do
+        printfn "%d: %O" st (swingDamage 0 st)
+    let thrustDamage st bonusOrPenalty =
+        if st < 13 then RollSpec.create(1,6, bonusOrPenalty + (st-14)/2)
+        elif st <= 40 then
+            let nDice = 1 + (st-11) / 8
+            let bonus = (st-11) / 2 % 4 - 1
+            RollSpec.create(nDice, 6, bonusOrPenalty + bonus)
+        else
+            notImpl "Thrust damage for ST 28+"
     type Creature = {
         name: string
         pluralName: string prop
@@ -49,8 +65,8 @@ module Core =
         member this.Damage_ =
             match defaultArg this.Damage (Thrust 0) with
             | Explicit roll -> roll
-            | Swing bonusOrPenalty -> swingDamage bonusOrPenalty
-            | Thrust bonusOrPenalty -> thrustDamage bonusOrPenalty
+            | Swing bonusOrPenalty -> swingDamage this.ST_ bonusOrPenalty
+            | Thrust bonusOrPenalty -> thrustDamage this.ST_ bonusOrPenalty
 
     type MonsterDatabase = {
         catalog: Map<string, Creature>
@@ -83,6 +99,8 @@ module Parser =
         | rest -> Some(0, rest)
     let (|DamageOverall|_|) = pack <| function
         | Roll(roll, OptionalDamageType(dt, rest)) -> Some((Explicit roll, dt), rest)
+        | OWSStr "swing" (OptionalIntMod(bonusOrPenalty, OptionalDamageType(dt, rest))) -> Some((Swing bonusOrPenalty, dt), rest)
         | OWSStr "sw" (OptionalIntMod(bonusOrPenalty, OptionalDamageType(dt, rest))) -> Some((Swing bonusOrPenalty, dt), rest)
+        | OWSStr "thrust" (OptionalIntMod(bonusOrPenalty, OptionalDamageType(dt, rest))) -> Some((Thrust bonusOrPenalty, dt), rest)
         | OWSStr "thr" (OptionalIntMod(bonusOrPenalty, OptionalDamageType(dt, rest))) -> Some((Thrust bonusOrPenalty, dt), rest)
         | _ -> None
