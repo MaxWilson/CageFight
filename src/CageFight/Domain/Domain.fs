@@ -63,10 +63,14 @@ module Core =
         member this.HP_ = defaultArg this.HP this.ST_
         member this.Speed_ = defaultArg this.Speed ((this.DX_ + this.HT_ |> float) / 4.)
         member this.Damage_ =
+            let addWeaponMasterDamage = function
+                | RollSpec(n, d, rest) as roll when this.WeaponMaster ->
+                    RollSpec.create(n*2) + roll
+                | otherwise -> otherwise
             match defaultArg this.Damage (Thrust 0) with
             | Explicit roll -> roll
-            | Swing bonusOrPenalty -> swingDamage this.ST_ bonusOrPenalty
-            | Thrust bonusOrPenalty -> thrustDamage this.ST_ bonusOrPenalty
+            | Swing bonusOrPenalty -> swingDamage this.ST_ bonusOrPenalty |> addWeaponMasterDamage
+            | Thrust bonusOrPenalty -> thrustDamage this.ST_ bonusOrPenalty |> addWeaponMasterDamage
 
     type MonsterDatabase = {
         catalog: Map<string, Creature>
