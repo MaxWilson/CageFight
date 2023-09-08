@@ -35,13 +35,14 @@ module Core =
               Damage = None
               DamageType = None
               }
+        // "_" means "defaulted" in the sense that it's the value that will be used if the property is not set.
         member this.ST_ = defaultArg this.ST 10
         member this.DX_ = defaultArg this.DX 10
         member this.IQ_ = defaultArg this.IQ 10
         member this.HT_ = defaultArg this.HT 10
         member this.HP_ = defaultArg this.HP this.ST_
         member this.Speed_ = defaultArg this.Speed ((this.DX_ + this.HT_ |> float) / 4.)
-
+        member this.PluralName_ = defaultArg this.pluralName (this.name + "s")
     type MonsterDatabase = {
         catalog: Map<string, Creature>
         }

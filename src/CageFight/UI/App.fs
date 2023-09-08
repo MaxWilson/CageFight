@@ -30,6 +30,7 @@ module App =
         | ClearError | Error of string
         | ChangeFight of (FightSetup -> FightSetup)
         | Clear of Side
+        | Upsert of Creature
         | SetPage of Page
     let update msg model =
         match msg with
@@ -42,6 +43,12 @@ module App =
                 | SideA -> { model.fightSetup with sideA = [] }
                 | SideB -> { model.fightSetup with sideB = Calibrate(None, None, None) }
             { model with fightSetup = clearSide side }, Cmd.Empty
+        | Upsert creature ->
+            if creature.name |> String.isntWhitespace then
+                let db = MonsterDatabase.add creature model.database
+                { model with database = db }, Cmd.Empty
+            else model, Cmd.Empty
+
     let init () =
         let db =
             ["Peshkali"; "Orc"; "Galdurnaut"; "Skeleton"]
@@ -130,7 +137,7 @@ module App =
             editDamageType "Damage type" DamageType.Other (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Other], (fun v -> { stats with DamageType = v } |> update))
 
             Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
-            Html.button [prop.text "OK"; prop.onClick notImpl]
+            Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home))]
             ]
 
 
@@ -166,8 +173,18 @@ module App =
                             prop.onSubmit(fun e -> e.preventDefault())
                             ]
                         class' "fightSetup" Html.div [
-                            let editButton (name: string) =
-                                classP' "editButton" Html.button [prop.text "Edit"; prop.onClick(fun _ -> dispatch (SetPage (Editing name)))]
+                            let editLink (quantity: int option) (name: string) =
+                                // for aesthetic reasons, we don't want quantity to be part of the link, so it's a separate HTML element
+                                let numberTxt, txt =
+                                    let creature = model.database.catalog[name]
+                                    match quantity with
+                                    | Some 1 -> Html.text "1", creature.name
+                                    | Some q -> Html.text (toString q), creature.PluralName_
+                                    | None -> Html.text "N", creature.PluralName_
+                                React.fragment [
+                                    numberTxt
+                                    classP' "editLink" Html.a [prop.text txt; prop.onClick(fun _ -> dispatch (SetPage (Editing name)))]
+                                    ]
                             class' "specificQuantity" Html.div [
                                 let changeQuantity name delta (f: FightSetup) =
                                     { f with
@@ -192,8 +209,7 @@ module App =
                                                 Html.div [
                                                     Html.button [prop.text "+"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity name +1)))]
                                                     Html.button [prop.text "-"; prop.onClick (fun _ -> dispatch (ChangeFight (changeQuantity name -1)))]
-                                                    Html.text $"{quantity} {name}s"
-                                                    editButton name
+                                                    editLink (Some quantity) name
                                                     ]
                                         ]
                                 ]
@@ -240,8 +256,7 @@ module App =
                                                 Html.div [
                                                     Html.button [prop.text "+"; onClick (changeQuantity name +1)]
                                                     Html.button [prop.text "-"; onClick (changeQuantity name -1)]
-                                                    Html.text $"{quantity} {name}s"
-                                                    editButton name
+                                                    editLink (Some quantity) name
                                                     ]
                                         ]
                                 | Calibrate(name, min, max) ->
@@ -254,8 +269,7 @@ module App =
                                         match name with
                                         | Some name ->
                                             Html.div [
-                                                Html.text $"N {name}s"
-                                                editButton name
+                                                editLink None name
                                                 Html.text "should lose"
                                                 class' "calibrationRange" Html.span [
                                                     Html.input [prop.type'.number; prop.placeholder (defaultArg min 50 |> toString); match min with Some min -> prop.valueOrDefault min | None -> ()]
