@@ -13,12 +13,12 @@ let makeVerify() =
     let verify = fun label condition -> testCase (addCounter label) <| fun _ -> Swensen.Unquote.Assertions.test condition
     let pverify = fun label condition -> ptestCase (addCounter label) <| fun _ -> Swensen.Unquote.Assertions.test condition
     verify, pverify
-let weaponStats (c: Creature) = c.WeaponSkill.Value, c.Damage.Value, c.DamageType.Value
+let weaponStats (c: Creature) = c.WeaponSkill.Value, c.Damage_, defaultArg c.DamageType Other
 
 let parseCreature (input: string): Creature =
     {   Creature.create "Bob the Barbarian" with
             WeaponSkill = Some 22
-            Damage = Some <| RollSpec.create(3,6,+7)
+            Damage = RollSpec.create(3,6,+7) |> Explicit |> Some
             DamageType = Some Cutting
         }
 [<Tests>]

@@ -52,9 +52,12 @@ module Parser =
         | Str "d" (IntNoWhitespace(n, rest)) -> Some(n, rest)
         | Str "d" rest -> Some(6, rest)
         | _ -> None
+    let (|IntModifier|_|) = function
+        | Str "+" (IntNoWhitespace(bonus, rest)) -> Some(bonus, rest)
+        | Str "-" (IntNoWhitespace(penalty, rest)) -> Some(-penalty, rest)
+        | _ -> None
     let (|Roll|_|) = pack <| function
-        | Int(n, (DieSize(dSize, OWSStr "+" (Int(bonus, rest))))) -> Some(RollSpec.create(n, dSize, bonus), rest)
-        | Int(n, (DieSize(dSize, OWSStr "-" (Int(penalty, rest))))) -> Some(RollSpec.create(n, dSize, -penalty), rest)
+        | Int(n, (DieSize(dSize, (IntModifier(bonusOrPenalty, rest))))) -> Some(RollSpec.create(n, dSize, bonusOrPenalty), rest)
         | Int(n, (DieSize(dSize, rest))) -> Some(RollSpec.create(n, dSize), rest)
         | Int(v, rest) -> Some(RollSpec.create v, rest)
         | _ -> None

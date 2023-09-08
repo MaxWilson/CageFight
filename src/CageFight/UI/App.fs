@@ -87,6 +87,8 @@ module App =
             prop.valueOrDefault txt
             prop.placeholder (render hint)
             propType
+            if propType = prop.type'.number then
+                prop.max 99
             prop.onChange updateTxt
             prop.onBlur (fun _ ->
                 let v = parser txt
@@ -108,13 +110,45 @@ module App =
                 ]
             prop.onChange (parser >> update)
             ]
+    let editDamage (label:string) (stats: Creature) update =
+        let value = stats.Damage
+        let render = toString
+        let txt, updateTxt = React.useState (match value with Some v -> render v | None -> $"")
+        labeled label <| React.fragment [
+            Html.input [
+                prop.valueOrDefault txt
+                prop.placeholder (render stats.Damage_)
+                prop.onChange updateTxt
+                prop.onBlur (fun _ ->
+                    match Packrat.ParseArgs.Init txt with
+                    | Domain.Parser.DamageOverall((dmg, dtype), Packrat.End) ->
+                        let stats' =
+                            { stats with Damage = Some dmg; DamageType = dtype |> Option.orElse stats.DamageType }
+                        update stats'
+                        updateTxt (stats'.Damage_ |> toString)
+                    | _ ->
+                        let stats' =
+                            { stats with Damage = None }
+                        update stats'
+                        updateTxt ""
+                    )
+                ]
+            let renderDamage = function
+            | Explicit r -> toString r
+            | Swing 0 -> "sw"
+            | Thrust 0 -> "thr"
+            | Swing v -> $"sw%+d{v}"
+            | Thrust v -> $"thr%+d{v}"
+            match stats.Damage with
+            | Some (Explicit _) -> () // if it's explicitly set then showing again would be redundant
+            | _ -> Html.text $"({stats.Damage_ |> toString})"
+            ]
     let [<ReactComponent>] editView (name: string) (db: MonsterDatabase) dispatch =
         let stats = (db.catalog |> Map.tryFind name |> Option.defaultValue (Creature.create name))
         let stats, update = React.useState stats
         let editString = editData<string>(prop.type'.text, toString, (fun (txt: string) -> if String.isntWhitespace txt then Some txt else None))
         let editNumber = editData(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
         let editDecimalNumber = editData(prop.type'.number, (fun v -> $"%.2f{v}"), (fun (input: string) -> match System.Double.TryParse input with true, n -> Some n | _ -> None))
-        let editRollSpec = editData(prop.type'.text, toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Parser.Roll (r, Packrat.End) -> Some r | _ -> None))
         let editDamageType = editDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
         let editBool label (value: bool, update) =
             labeled label <| Html.input [
@@ -122,7 +156,7 @@ module App =
                 prop.valueOrDefault value
                 prop.onCheckedChange update
                 ]
-        Html.div [
+        class' "editView" Html.div [
             editString "Name" "" (Some stats.name, (fun txt -> { stats with name = defaultArg txt "" } |> update))
             editString "Pluralized" (stats.name + "s") (stats.pluralName, (fun txt -> { stats with pluralName = txt } |> update))
             editNumber "ST" stats.ST_ (stats.ST, (fun n -> { stats with ST = n } |> update))
@@ -133,7 +167,7 @@ module App =
             editDecimalNumber "Speed" stats.Speed_ (stats.Speed, (fun n -> { stats with Speed = n } |> update))
             editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
             editNumber "Weapon Skill" 10 (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
-            editRollSpec "Damage" (RollSpec.create(1,6)) (stats.Damage, (fun dmg -> { stats with Damage = dmg } |> update))
+            editDamage "Damage" stats update
             editDamageType "Damage type" DamageType.Other (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Other], (fun v -> { stats with DamageType = v } |> update))
 
             Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
@@ -272,9 +306,9 @@ module App =
                                                 editLink None name
                                                 Html.text "should lose"
                                                 class' "calibrationRange" Html.span [
-                                                    Html.input [prop.type'.number; prop.placeholder (defaultArg min 50 |> toString); match min with Some min -> prop.valueOrDefault min | None -> ()]
+                                                    Html.input [prop.type'.number; prop.placeholder (defaultArg min 50 |> toString); prop.max 99; match min with Some min -> prop.valueOrDefault min | None -> ()]
                                                     Html.text "% to "
-                                                    Html.input [prop.type'.number; prop.placeholder (defaultArg min 80 |> toString); match max with Some max -> prop.valueOrDefault max | None -> ()]
+                                                    Html.input [prop.type'.number; prop.placeholder (defaultArg min 80 |> toString); prop.max 99; match max with Some max -> prop.valueOrDefault max | None -> ()]
                                                     Html.text "% of the time"
                                                     ]
                                                 ]
