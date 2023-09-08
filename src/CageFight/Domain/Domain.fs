@@ -80,6 +80,7 @@ module Core =
         static member add (monster: Creature) (db: MonsterDatabase) =
             { db with catalog = Map.add monster.name monster db.catalog }
 
+#nowarn "40" // we're not planning on doing any unsafe things during initialization, like evaluating the functions that rely on the object we're busy constructing
 module Parser =
     open Packrat
     open Random
@@ -107,4 +108,31 @@ module Parser =
         | OWSStr "sw" (OptionalIntMod(bonusOrPenalty, OptionalDamageType(dt, rest))) -> Some((Swing bonusOrPenalty, dt), rest)
         | OWSStr "thrust" (OptionalIntMod(bonusOrPenalty, OptionalDamageType(dt, rest))) -> Some((Thrust bonusOrPenalty, dt), rest)
         | OWSStr "thr" (OptionalIntMod(bonusOrPenalty, OptionalDamageType(dt, rest))) -> Some((Thrust bonusOrPenalty, dt), rest)
+        | _ -> None
+    let (|CreatureProperty|_|) =
+        pack <| function
+        // e.g. ST 17 DX 12 IQ 9 HT 11 HP 22 Speed 14 Weapon Master Skill 22 sw+2 cut
+        | OWSStr "ST" (Int (v, rest)) -> Some((fun c -> { c with ST = Some v }), rest)
+        | OWSStr "DX" (Int (v, rest)) -> Some((fun c -> { c with DX = Some v }), rest)
+        | OWSStr "IQ" (Int (v, rest)) -> Some((fun c -> { c with IQ = Some v }), rest)
+        | OWSStr "HT" (Int (v, rest)) -> Some((fun c -> { c with HT = Some v }), rest)
+        | OWSStr "HP" (Int (v, rest)) -> Some((fun c -> { c with HP = Some v }), rest)
+        | OWSStr "Speed" (Int (v, rest)) -> Some((fun c -> { c with Speed = Some v }), rest)
+        | OWSStr "Weapon Master" rest -> Some((fun c -> { c with WeaponMaster = true }), rest)
+        | OWSStr "Skill" (Int (v, rest)) -> Some((fun c -> { c with WeaponSkill = Some v }), rest)
+        | DamageOverall((damage, damageType), rest) -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType }), rest)
+        | _ -> None
+    let rec (|CreatureProperties|_|) = pack <| function
+        | CreatureProperties(fprops, CreatureProperty(fprop, rest)) -> Some(fprops >> fprop, rest)
+        | CreatureProperty(fprop, rest) ->
+            Some(fprop, rest)
+        | _ -> None
+    let (|Creature|_|) = pack <| function
+        | Words(name, OWSStr "[" (Words(plural, OWSStr "]" (OWSStr ":" (CreatureProperties(fprops, rest)))))) ->
+            Some(Creature.create(name, plural) |> fprops, rest)
+        | Words(name, OWSStr ":" (CreatureProperties(fprops, rest))) ->
+            Some(Creature.create(name) |> fprops, rest)
+        | _ -> None
+    let (|Command|_|) = pack <| function
+        | Str "add" (Creature(monster, rest)) -> Some((fun db -> MonsterDatabase.add monster db), rest)
         | _ -> None

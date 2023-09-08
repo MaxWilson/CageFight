@@ -1,6 +1,7 @@
 #load @"Core\Common.fs"
 #load @"Core\Packrat.fs"
 #load @"Domain\Random.fs"
+#load @"Domain\Domain.fs"
 open Domain.Random
 let swingDamage st bonusOrPenalty =
     if st < 9 then RollSpec.create(1,6, bonusOrPenalty + (st-12)/2)
@@ -22,3 +23,8 @@ let thrustDamage st bonusOrPenalty =
         notImpl "Thrust damage for ST 28+"
 for st in [1..40] do
     printfn "%d: %O" st (thrustDamage st 0)
+
+open Domain.Parser
+open Packrat
+match ParseArgs.Init "Bob the Barbarian: ST 14" with
+| Creature(c, End) -> c
