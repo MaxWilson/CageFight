@@ -152,7 +152,7 @@ module App =
         let editBool label (value: bool, update) =
             labeled label <| Html.input [
                 prop.type'.checkbox
-                prop.valueOrDefault value
+                prop.isChecked value
                 prop.onCheckedChange update
                 ]
         class' "editView" Html.div [
