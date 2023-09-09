@@ -68,7 +68,7 @@ module App =
             monsterDetails
             if namePrefix.Length > 0 || noMonstersSelectedYet then
                 let matchingNames = db.catalog.Keys |> Seq.filter (fun name -> name.StartsWith(namePrefix, System.StringComparison.InvariantCultureIgnoreCase)) |> List.ofSeq
-                for name in matchingNames |> List.take (min 5 matchingNames.Length) do
+                for name in matchingNames |> List.take (min 10 matchingNames.Length) do
                     Html.div [
                         Html.button [prop.text clickLabel; prop.onClick(fun _ -> onClick name)]
                         Html.text name
