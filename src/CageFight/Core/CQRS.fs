@@ -32,6 +32,8 @@ type CQRS<'msg, 'state>(initialState: 'state, execute) =
             stateHistoryRev <- removal@stateHistoryRev
             state <- stateFuturesRev.Head |> snd
         | None -> failwith $"Invalid marker: {mark}"
+    member this.Log() = stateHistoryRev |> List.map fst |> List.rev
+    member this.LogWithStates() = stateHistoryRev |> List.rev
     static member Create(st, f) : CQRS<_,_> = CQRS(st, f)
 
 
