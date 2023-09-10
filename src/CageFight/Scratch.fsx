@@ -282,19 +282,23 @@ let calibrate db team1 (enemyType, minbound, maxbound) =
     let inbounds n = betweenInclusive (minbound * 10. |> int) (maxbound * 10. |> int) (get n |> fst)
     match [1..100] |> List.filter inbounds with
     | [] ->
-        None, None
+        None, None, results
     | inbounds ->
         let min = inbounds |> List.min
         let max = inbounds |> List.max
-        Some(min, get min), Some(max, get max)
+        Some(min, get min), Some(max, get max), results
+let calibrateAndOutput db team1 (enemyType, min, max) =
+    match calibrate db team1 (enemyType, min, max) with
+    | Some(minN, (victories, log)), Some(maxN, (victories2, log2)), results ->
+        let team1 = team1 |> List.map (fun (n, name) -> $"{n} {name}") |> String.concat ", "
+        for k in results.Keys |> Seq.sort do
+            printfn $"{k} {results[k] |> fst}"
+        printfn $"{team1}\n beats {minN}-{maxN} {enemyType} {min*100.}%% to {max*100.}%% of the time ({minN}={victories2*10}%%, {maxN} = {victories*10}%%)"
+    | _ -> notImpl()
 let db = Defaults.database()
 let combat = createCombat db [ 3, "Orc"; 1, "Slugbeast"; 1, "Skeleton"] [ 14, "Orc" ]
 combat.combatants.Values |> Seq.filter (fun c -> c.team = 0)
 combat.combatants.Values |> Seq.sortBy(fun c -> c.Id) |> Seq.map (fun c -> $"{c.Id}") |> Seq.iter (printfn "%s")
 let cqrs = CQRS.CQRS.Create(combat, (fun msg model -> notify msg; update msg model))
 fight cqrs
-let mins, maxs = calibrate db [ 3, "Orc"; 1, "Slugbeast"; 1, "Skeleton"] ("Orc", 0.30, 0.90)
-(snd mins.Value) |> fst
-(snd maxs.Value) |> fst
-fst mins.Value
-fst maxs.Value
+calibrateAndOutput db [ 5, "Orc"; 1, "Slugbeast"; 3, "Peshkali" ] ("Orc", 0.50, 0.80)
