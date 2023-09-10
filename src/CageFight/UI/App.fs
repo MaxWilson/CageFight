@@ -10,7 +10,7 @@ open Domain.Random.Parser
 // make sure errors are not silent: show them as Alerts (ugly but better than nothing for now)
 open Fable.Core.JsInterop
 open Fable.Core
-
+open UI.FightExecution
 importSideEffects "../sass/main.sass"
 
 module App =
@@ -24,7 +24,17 @@ module App =
         sideA: (int * string) list
         sideB: Opposition
         }
-    type Model = { error: string option; page: Page; fightSetup: FightSetup; database : MonsterDatabase }
+    type 't Awaitable =
+        | NotStarted
+        | InProgress
+        | Completed of 't
+    type Model = {
+        error: string option
+        page: Page
+        fightSetup: FightSetup
+        database : MonsterDatabase
+        execution: Awaitable<FightResult>
+        }
     type Side = SideA | SideB
     type Msg =
         | ClearError | Error of string
@@ -32,6 +42,7 @@ module App =
         | Clear of Side
         | Upsert of Creature
         | SetPage of Page
+        | Fight of FightResult Awaitable
     let update msg model =
         match msg with
         | ChangeFight f -> { model with fightSetup = f model.fightSetup }, Cmd.Empty
@@ -49,6 +60,7 @@ module App =
                 LocalStorage.Catalog.write db.catalog
                 { model with database = db }, Cmd.Empty
             else model, Cmd.Empty
+        | Fight v -> { model with execution = v }, Cmd.Empty
 
     let init () =
         let db =
@@ -57,7 +69,14 @@ module App =
             sideA = [3, "Peshkali"; 1, "Slugbeast"]
             sideB = Calibrate(Some "Orc", None, None)
             }
-        { error = None; page = Home; fightSetup = fight; database = db }, Cmd.Empty
+        { error = None; page = Home; fightSetup = fight; database = db; execution = NotStarted }, Cmd.Empty
+
+    let beginFights (model: Model) dispatch =
+        Fight InProgress |> dispatch
+        async {
+            do! Async.Sleep 1000
+            Fight NotStarted |> dispatch // todo: produce a result instead of just going back to NotStarted
+            } |> Async.Start |> ignore
 
     let [<ReactComponent>] monsterPicker (db: MonsterDatabase, noMonstersSelectedYet) (clickLabel: string, onClick, side, dispatch) (monsterDetails: ReactElement) =
         let namePrefix, update = React.useState ""
@@ -316,17 +335,28 @@ module App =
                                         ]
                                 ]
                             ]
-                        Html.button [prop.text "Execute"]
-                        class' "statistics" Html.div [
-                            Html.div "3 peshkalis wins 50-80% of the time against 14-17 orcs"
-                            ]
-                        class' "fightLog" Html.div [
-                            Html.div "Peshkali hits orc 1, blahblahblah"
-                            Html.button [prop.text "<<"]
-                            Html.button [prop.text "<"]
-                            Html.button [prop.text ">"]
-                            Html.button [prop.text ">>"]
-                            ]
+                        Html.button [prop.text "Execute"; prop.onClick (thunk2 beginFights model dispatch)]
+                        match model.execution with
+                        | InProgress ->
+                            Html.div "Executing..."
+                            Html.div [
+                                prop.className "busy"
+                                prop.children [
+                                    for _ in 1..10 do
+                                        class' "wave" Html.div []
+                                    ]
+                                ]
+                        | NotStarted | Completed _ ->
+                            class' "statistics" Html.div [
+                                Html.div "3 peshkalis wins 50-80% of the time against 14-17 orcs"
+                                ]
+                            class' "fightLog" Html.div [
+                                Html.div "Peshkali hits orc 1, blahblahblah"
+                                Html.button [prop.text "<<"]
+                                Html.button [prop.text "<"]
+                                Html.button [prop.text ">"]
+                                Html.button [prop.text ">>"]
+                                ]
                         ]
                     ]
                ]

@@ -18,6 +18,7 @@
         <Compile Include="UI\LocalStorage.fs" />
         <Compile Include="UI\DragDrop.fs" />
         <Compile Include="UI\Konva.fs" />
+        <Compile Include="UI\FightExecution.fs" />
         <Compile Include="UI\App.fs" />
     </ItemGroup>
     <ItemGroup>

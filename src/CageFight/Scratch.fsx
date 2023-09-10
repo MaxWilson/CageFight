@@ -101,7 +101,7 @@ type Ids =
     member this.TargetTeam_ = fst this.target
 type DefenseType = Parry | Block | Dodge
 type DefenseDetails = { defense: DefenseType; targetRetreated: bool }
-type Notification =
+type Event =
     | Hit of Ids * DefenseDetails * injury:int * Status list * string
     | SuccessfulDefense of Ids * DefenseDetails * string
     | Miss of Ids * string
