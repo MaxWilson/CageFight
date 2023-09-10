@@ -1,4 +1,5 @@
 #load @"Core\Common.fs"
+#load @"Core\CQRS.fs"
 #load @"Core\Packrat.fs"
 #load @"Domain\Random.fs"
 #load @"Domain\Domain.fs"
@@ -35,22 +36,30 @@ type Combatant = {
     stats: Creature
     damageTaken: int
     statusMods: Status list
+    retreatUsed: bool
+    blockUsed: bool
+    parriesUsed: int
     }
     with
     member this.CurrentHP_ = this.stats.HP_ - this.damageTaken
     member this.Id : CombatantId = this.team, this.personalName
+    static member fresh (team, name, number, stats: Creature) =
+        {   team = team
+            personalName = name
+            number = number
+            stats = stats
+            damageTaken = 0
+            statusMods = []
+            retreatUsed = false
+            blockUsed = false
+            parriesUsed = 0
+            }
 type Combat = {
     combatants: Map<CombatantId, Combatant>
     }
 let toCombatants (db: Map<string, Creature>) team (quantity, name:string) =
     [for i in 1..quantity do
-        {   personalName =
-                if quantity > 1 then sprintf "%s %d" name i else name
-            number = i
-            team = team
-            stats = db[name]
-            damageTaken = 0
-            statusMods = [] }
+        Combatant.fresh(team, (if quantity > 1 then $"{name} {i}" else name), i, db[name])
         ]
 let createCombat (db: Map<string, Creature>) team1 team2 =
     { combatants =
@@ -88,5 +97,76 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
             c.number)
     potentialTargets |> Seq.tryHead
 combat.combatants[(0, "Orc 3")] |> tryFindTarget combat
+type Ids =
+    { attacker: CombatantId; target: CombatantId }
+    with
+    member this.Attacker_ = snd this.attacker
+    member this.AttackerTeam_ = fst this.attacker
+    member this.Target_ = snd this.target
+    member this.TargetTeam_ = fst this.target
+type DefenseType = Parry | Block | Dodge
+type DefenseDetails = { defense: DefenseType; targetRetreated: bool }
+type Notification =
+    | Hit of Ids * DefenseDetails * injury:int * Status list * string
+    | SuccessfulDefense of Ids * DefenseDetails * string
+    | Miss of Ids * string
+let notify msg =
+    match msg with
+    | Hit (ids, _, injury, statusImpact, rollDetails) ->
+        match statusImpact with
+        | v when v |> List.contains Dead ->
+            printfn $"{ids.Attacker_} kills {ids.Target_} with a hit for {injury} HP {rollDetails}"
+        | v when v |> List.contains Stunned ->
+            printfn $"{ids.Attacker_} stuns {ids.Target_} with a hit for {injury} HP {rollDetails}"
+        | _ ->
+            printfn $"{ids.Attacker_} hits {ids.Target_} for {injury} HP {rollDetails}"
+    | SuccessfulDefense(ids, { defense = Parry }, rollDetails) ->
+        printfn $"{ids.Target_} parries {ids.Attacker_}'s attack {rollDetails}"
+    | SuccessfulDefense(ids, { defense = Block }, rollDetails) ->
+        printfn $"{ids.Target_} blocks {ids.Attacker_}'s attack {rollDetails}"
+    | SuccessfulDefense(ids, { defense = Dodge }, rollDetails) ->
+        printfn $"{ids.Target_} dodges {ids.Attacker_}'s attack {rollDetails}"
+    | Miss (ids, rollDetails) ->
+        printfn $"{ids.Attacker_} misses {ids.Target_} {rollDetails}"
 for c in combat.combatants.Values |> Seq.sortBy (fun c -> c.team, c.stats.name, c.number) do
     printfn "%A attacks %A" c.Id (tryFindTarget combat c).Value.Id
+
+let update msg model =
+    let updateCombatant id (f: Combatant -> Combatant) model =
+        { model with
+            combatants =
+                model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None)
+            }
+    let consumeDefense (id: CombatantId) (defense: DefenseDetails) =
+        updateCombatant id (fun c ->
+            { c with
+                retreatUsed = c.retreatUsed || defense.targetRetreated
+                blockUsed = c.blockUsed || defense.defense = Block
+                parriesUsed = c.parriesUsed + (if defense.defense = Parry then 1 else 0)
+                })
+    let resetDefenses (id: CombatantId) =
+        updateCombatant id (fun c ->
+            { c with
+                retreatUsed = false
+                blockUsed = false
+                parriesUsed = 0
+                })
+    let takeDamage (id: CombatantId) amount conditions =
+        updateCombatant id (fun c ->
+            { c with
+                damageTaken = c.damageTaken + amount
+                statusMods = List.distinct (c.statusMods @ conditions)
+                })
+    match msg with
+    | Hit (ids, defense, injury, statusImpact, rollDetails) ->
+        model |> resetDefenses ids.attacker
+              |> consumeDefense ids.target defense
+              |> takeDamage ids.target injury statusImpact
+    | SuccessfulDefense(ids, defense, rollDetails) ->
+        model |> resetDefenses ids.attacker
+              |> consumeDefense ids.target defense
+    | Miss (ids, rollDetails) ->
+        model |> resetDefenses ids.attacker
+
+let cqrs = CQRS.CQRS.Create(combat, (fun msg model -> notify msg; update msg model))
+cqrs.Execute(Hit({ attacker = 0, "Orc 3"; target = 1, "Orc 1" }, { defense = Parry; targetRetreated = false }, 5, [Stunned], "blahblahblah"))
