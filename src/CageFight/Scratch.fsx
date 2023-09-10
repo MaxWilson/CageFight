@@ -278,9 +278,15 @@ let calibrate db team1 (enemyType, minbound, maxbound) =
             let victories = runs |> List.sumBy (function (_, v) when v.victors = [1] -> 1 | _ -> 0)
             results <- results |> Map.add n (victories, sampleLog)
             results[n]
-    // crude and naive model: search from 1 to 100
+    // crude and naive model: search from 1 to 100, but quit early when we fall to 0% victory
+    let upToOneHundred =
+        let rec loop n =
+            if get n |> fst > 0 && n <= 100 then
+                n::(loop (n+1))
+            else []
+        loop 1
     let inbounds n = betweenInclusive (minbound * 10. |> int) (maxbound * 10. |> int) (get n |> fst)
-    match [1..100] |> List.filter inbounds with
+    match upToOneHundred |> List.filter inbounds with
     | [] ->
         None, None, results
     | inbounds ->
@@ -301,4 +307,4 @@ combat.combatants.Values |> Seq.filter (fun c -> c.team = 0)
 combat.combatants.Values |> Seq.sortBy(fun c -> c.Id) |> Seq.map (fun c -> $"{c.Id}") |> Seq.iter (printfn "%s")
 let cqrs = CQRS.CQRS.Create(combat, (fun msg model -> notify msg; update msg model))
 fight cqrs
-calibrateAndOutput db [ 5, "Orc"; 1, "Slugbeast"; 3, "Peshkali" ] ("Orc", 0.50, 0.80)
+calibrateAndOutput db [ 90, "Orc"; 1, "Slugbeast"; 3, "Peshkali" ] ("Orc", 0.50, 0.80)
