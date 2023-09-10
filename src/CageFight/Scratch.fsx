@@ -63,7 +63,7 @@ let toCombatants (db: Map<string, Creature>) team (quantity, name:string) =
         ]
 let createCombat (db: Map<string, Creature>) team1 team2 =
     { combatants =
-        (team1 |> List.collect (toCombatants db 0)) @ (team2 |> List.collect (toCombatants db 1))
+        (team1 |> List.collect (toCombatants db 1)) @ (team2 |> List.collect (toCombatants db 2))
         |> Seq.map(fun c -> c.Id, c)
         |> Map.ofSeq
         }
@@ -91,7 +91,7 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
             c.stats.name,
             c.number)
     potentialTargets |> Seq.tryHead
-combat.combatants[(0, "Orc 3")] |> tryFindTarget combat
+
 type Ids =
     { attacker: CombatantId; target: CombatantId }
     with
@@ -135,8 +135,6 @@ let notify msg =
         printfn $"{id} stands up {rollDetails}"
     | Info (id, msg) ->
         printfn $"{id} {msg}"
-for c in combat.combatants.Values |> Seq.sortBy (fun c -> c.team, c.stats.name, c.number) do
-    printfn "%A attacks %A" c.Id (tryFindTarget combat c).Value.Id
 
 let update msg model =
     let updateCombatant id (f: Combatant -> Combatant) model =
@@ -263,11 +261,40 @@ let fight (cqrs: CQRS.CQRS<_,Combat>) =
             fightOneRound cqrs
             loop (counter + 1)
     loop 0
-
+let calibrate db team1 (enemyType, minbound, maxbound) =
+    let runForN n =
+        let combat = createCombat db team1 [ n, enemyType ]
+        let cqrs = CQRS.CQRS.Create(combat, update)
+        cqrs, fight cqrs
+    let mutable results = Map.empty
+    let get n =
+        if results.ContainsKey n then results[n]
+        else
+            let runs = [
+                for run in 1..10 do
+                    runForN n
+                ]
+            let sampleLog = (runs |> List.last |> fst).LogWithStates()
+            let victories = runs |> List.sumBy (function (_, v) when v.victors = [1] -> 1 | _ -> 0)
+            results <- results |> Map.add n (victories, sampleLog)
+            results[n]
+    // crude and naive model: search from 1 to 100
+    let inbounds n = betweenInclusive (minbound * 10. |> int) (maxbound * 10. |> int) (get n |> fst)
+    match [1..100] |> List.filter inbounds with
+    | [] ->
+        None, None
+    | inbounds ->
+        let min = inbounds |> List.min
+        let max = inbounds |> List.max
+        Some(min, get min), Some(max, get max)
 let db = Defaults.database()
-(3, "Orc") |> toCombatants db 0
 let combat = createCombat db [ 3, "Orc"; 1, "Slugbeast"; 1, "Skeleton"] [ 14, "Orc" ]
 combat.combatants.Values |> Seq.filter (fun c -> c.team = 0)
 combat.combatants.Values |> Seq.sortBy(fun c -> c.Id) |> Seq.map (fun c -> $"{c.Id}") |> Seq.iter (printfn "%s")
 let cqrs = CQRS.CQRS.Create(combat, (fun msg model -> notify msg; update msg model))
 fight cqrs
+let mins, maxs = calibrate db [ 3, "Orc"; 1, "Slugbeast"; 1, "Skeleton"] ("Orc", 0.30, 0.90)
+(snd mins.Value) |> fst
+(snd maxs.Value) |> fst
+fst mins.Value
+fst maxs.Value
