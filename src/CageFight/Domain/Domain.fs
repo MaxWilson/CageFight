@@ -15,8 +15,6 @@ module Core =
             RollSpec.create(nDice, 6, bonusOrPenalty + bonus)
         else
             notImpl "Swing damage for ST 28+"
-    for st in [1..27] do
-        printfn "%d: %O" st (swingDamage 0 st)
     let thrustDamage st bonusOrPenalty =
         if st < 13 then RollSpec.create(1,6, bonusOrPenalty + (st-14)/2)
         elif st <= 40 then

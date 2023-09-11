@@ -42,6 +42,7 @@ type Ids =
 type DefenseType = Parry | Block | Dodge
 type DefenseDetails = { defense: DefenseType; targetRetreated: bool }
 
+[<AutoOpen>]
 module CombatEvents =
     type Event =
         | Hit of Ids * DefenseDetails * injury:int * Status list * string
@@ -97,11 +98,164 @@ module CombatEvents =
                 { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
         | Info _ -> model
 
-type CalibrationResult = {
-    quantity: int
-    winFraction: float
-    sampleCombat: Combat
-    }
 type FightResult =
-    | CalibratedResult of CalibrationResult
-    | SpecificResult of Combat
+    | CalibratedResult of lower:int * upper:int * sample:Combat
+    | SpecificResult of Combat * {| victors: int list |}
+
+let tryFindTarget (combat: Combat) (attacker: Combatant) =
+    let betweenInclusive (min, max) x = min <= x && x <= max
+    let potentialTargets =
+        combat.combatants.Values
+        |> Seq.filter (fun c -> c.team <> attacker.team)
+        |> Seq.filter (fun c -> c.statusMods |> List.forall (fun s -> not (s = Dead || s = Unconscious)))
+        // We don't want to overkill damage, so we put targets that might fall unconscious by themselves
+        // fairly low in priority, although we also want to damage vulnerable targets while they're vulnerable
+        // so we put stunned and prone targets at high priority.
+        // prefer targets that are stunned but not yet at -HP,
+        // then targets that are prone but not yet at -HP,
+        // then targets that are below 1/3 HP but not yet at 0 HP,
+        // then targets at or below 0 HP
+        // then anyone still alive (ordered by statblock name and number because why not, and it makes readouts more predictable)
+        |> Seq.sortBy(fun c ->
+            (c.statusMods |> List.exists ((=) Stunned))
+                && c.CurrentHP_ > -c.stats.HP_,
+            (c.statusMods |> List.exists ((=) Prone))
+                && c.CurrentHP_ > -c.stats.HP_,
+            betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_,
+            c.CurrentHP_ <= 0,
+            c.stats.name,
+            c.number)
+    potentialTargets |> Seq.tryHead
+
+let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
+    for c in cqrs.State.combatants.Values |> Seq.sortBy (fun c -> c.stats.Speed_, c.stats.DX_, c.personalName) |> Seq.map (fun c -> c.Id) do
+        let d = RollSpec.create(3,6)
+        let attackRoll = d.roll()
+        let mutable msg = ""
+        let recordMsg txt =
+            if msg = "" then msg <- txt else msg <- $"{msg}; {txt}"
+        let attempt label targetNumber =
+            let roll = d.roll()
+            if roll <= targetNumber then
+                recordMsg $"{label} ({roll}/{targetNumber}) succeeded"
+                true
+            else
+                recordMsg $"{label} ({roll}/{targetNumber}) failed"
+                false
+        let checkGoesUnconscious (self: Combatant) incomingDamage =
+            let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
+            attempt "Stay conscious" (self.stats.HT_ - penalty)
+
+        let self = cqrs.State.combatants[c]
+        if self.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
+            let cmd =
+                if self.CurrentHP_ <= 0 && checkGoesUnconscious self 0 then
+                    FallUnconscious(self.Id, msg)
+                elif self.statusMods |> List.exists ((=) Stunned) then
+                    if attempt "Recover from stun" self.stats.HT_ then
+                        Unstun(self.Id, msg)
+                    else
+                        Info(self.Id, msg)
+                elif self.statusMods |> List.exists ((=) Prone) then
+                    StandUp(self.Id, msg)
+                else
+                    match self |> tryFindTarget cqrs.State with
+                    | Some victim ->
+                        if attempt "Attack" (defaultArg self.stats.WeaponSkill 10) then
+                            let defenseRoll = d.roll()
+                            let dodgeTarget, retreat = if victim.retreatUsed then int victim.stats.Speed_, false else (3 + int victim.stats.Speed_), true
+                            let defense = { defense = Dodge; targetRetreated = retreat }
+                            if attempt (if retreat then "Dodge and retreat" else "Dodge") dodgeTarget then
+                                SuccessfulDefense({ attacker = self.Id; target = victim.Id }, defense, msg)
+                            else
+                                let dmg = self.stats.Damage_.roll()
+                                let penetratingDmg = dmg // todo: account for DR
+                                let injury = match self.stats.DamageType with
+                                                | Some Cutting -> (float penetratingDmg * 1.5) |> int
+                                                | Some Impaling -> penetratingDmg * 2
+                                                | _ -> penetratingDmg
+                                let mutable newConditions = []
+                                let hp' = victim.CurrentHP_ - injury
+                                // -5 x max HP is auto-death
+                                if hp' <= victim.stats.HP_ * -5 then
+                                    newConditions <- [Dead]
+                                // check for death if crossing a HP threshold, -1 x max HP or below
+                                elif hp' <= victim.stats.HP_ * -1 && ((hp' / victim.stats.HP_) <> (victim.CurrentHP_ / victim.stats.HP_)) && (attempt "Deathcheck" victim.stats.HT_ |> not) then
+                                    newConditions <- [Dead]
+                                // check for unconsciousness on dropping to zero HP
+                                elif self.CurrentHP_ > 0 && hp' <= 0 && checkGoesUnconscious victim injury then
+                                    newConditions <- [Unconscious]
+                                elif injury > (victim.stats.HP_ + 1) / 2 && attempt "Knockdown check" victim.stats.HT_ then
+                                    newConditions <- [Stunned; Prone]
+                                Hit({ attacker = self.Id; target = victim.Id }, { defense = Parry; targetRetreated = false }, injury, newConditions, msg)
+                        else
+                            Miss({ attacker = self.Id; target = victim.Id }, msg)
+                    | None ->
+                        recordMsg "can't find a victim"
+                        Info(self.Id, msg)
+            cqrs.Execute cmd
+
+let fight (cqrs: CQRS.CQRS<_,Combat>) =
+    let rec loop counter =
+        let survivingTeams =
+            let everyone = cqrs.State.combatants.Values |> List.ofSeq
+            everyone |> List.choose (fun c -> if not (c.statusMods |> List.exists (fun m -> m = Dead || m = Unconscious)) then Some c.team else None)
+                     |> List.distinct
+        if survivingTeams.Length < 2 || counter = 100 then
+            // it's possible to have a tie or a mutual kill
+            {| victors = survivingTeams |}
+        else
+            fightOneRound cqrs
+            loop (counter + 1)
+    loop 0
+
+let toCombatants (db: Map<string, Creature>) team (quantity, name:string) =
+    [for i in 1..quantity do
+        Combatant.fresh(team, (if quantity > 1 then $"{name} {i}" else name), i, db[name])
+        ]
+let createCombat (db: Map<string, Creature>) team1 team2 =
+    { combatants =
+        (team1 |> List.collect (toCombatants db 1)) @ (team2 |> List.collect (toCombatants db 2))
+        |> Seq.map(fun c -> c.Id, c)
+        |> Map.ofSeq
+        }
+let specificFight db team1 team2 =
+    let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), update)
+    let victors = fight cqrs
+    cqrs.State, victors
+let calibrate db team1 (enemyType, minbound, maxbound) =
+    let runForN n =
+        let combat = createCombat db team1 [ n, enemyType ]
+        let cqrs = CQRS.CQRS.Create(combat, update)
+        cqrs, fight cqrs
+    let mutable results = Map.empty
+    let get n =
+        if results.ContainsKey n then results[n]
+        else
+            let runs = [
+                for run in 1..10 do
+                    runForN n
+                ]
+            let sampleLog = (runs |> List.last |> fst).LogWithStates()
+            let victories = runs |> List.sumBy (function (_, v) when v.victors = [1] -> 1 | _ -> 0)
+            results <- results |> Map.add n (victories, sampleLog)
+            results[n]
+    // crude and naive model: search from 1 to 100, but quit early when we fall to 0% victory
+    let upToOneHundred =
+        let rec loop n =
+            if get n |> fst > 0 && n <= 100 then
+                n::(loop (n+1))
+            else []
+        loop 1
+    let inbounds n = betweenInclusive (minbound * 10. |> int) (maxbound * 10. |> int) (get n |> fst)
+    match upToOneHundred |> List.filter inbounds with
+    | [] ->
+        for n in 1..100 do
+            let victories, sampleLog = get n
+            printfn $"against {n} {enemyType}: {victories} victories"
+        None, None, None
+    | inbounds ->
+        let min = inbounds |> List.min
+        let max = inbounds |> List.max
+        let sampleFight = get min |> snd |> List.head |> snd
+        Some min, Some max, Some sampleFight

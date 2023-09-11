@@ -72,12 +72,37 @@ module App =
         { error = None; page = Home; fightSetup = fight; database = db; execution = NotStarted }, Cmd.Empty
 
     let beginFights (model: Model) dispatch =
-        Fight InProgress |> dispatch
-        async {
-            for x in 1..100000 do
-                printfn "%A" x
-            Fight NotStarted |> dispatch // todo: produce a result instead of just going back to NotStarted
-            } |> Async.StartImmediate |> ignore
+        if model.execution = InProgress then
+            ()
+        else
+            let g = System.Guid.NewGuid()
+            Fight InProgress |> dispatch
+            async {
+                match model.fightSetup.sideB with
+                | _ when (model.fightSetup.sideA |> List.sumBy fst) = 0 ->
+                    Fight NotStarted |> dispatch
+                    dispatch (Error "You have to pick monsters first")
+                | Calibrate(None, _, _) ->
+                    Fight NotStarted |> dispatch
+                    dispatch (Error "You have to pick monsters first")
+                | Calibrate(Some name, min, max) ->
+                    let min = (defaultArg min 50 |> float) / 100.
+                    let max = (defaultArg max 80 |> float) / 100.
+                    match calibrate model.database.catalog
+                            model.fightSetup.sideA
+                            (name, min, max) with
+                    | Some minQuantity, Some maxQuantity, Some sampleMaxFight ->
+                        Completed(CalibratedResult(minQuantity, maxQuantity, sampleMaxFight)) |> Fight |> dispatch
+                    | v ->
+                        Fight NotStarted |> dispatch
+                        Error "Failed to find a number of monsters that would satisfy those constraints. Try a wider range like 20% to 100%" |> dispatch
+                | Specific(sideB) ->
+                    specificFight model.database.catalog model.fightSetup.sideA sideB
+                        |> SpecificResult
+                        |> Completed
+                        |> Fight
+                        |> dispatch
+                } |> Async.StartImmediate |> ignore
 
     let [<ReactComponent>] monsterPicker (db: MonsterDatabase, noMonstersSelectedYet) (clickLabel: string, onClick, side, dispatch) (monsterDetails: ReactElement) =
         let namePrefix, update = React.useState ""
@@ -346,8 +371,8 @@ module App =
                             ]
                         Html.button [prop.text "Execute"; prop.onClick (thunk2 beginFights model dispatch)]
                         match model.execution with
-                        | InProgress -> ()
-                        | NotStarted | Completed _ ->
+                        | NotStarted | InProgress -> ()
+                        | Completed _ ->
                             class' "statistics" Html.div [
                                 Html.div "3 peshkalis wins 50-80% of the time against 14-17 orcs"
                                 ]
