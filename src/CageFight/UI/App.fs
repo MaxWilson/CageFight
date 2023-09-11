@@ -206,7 +206,7 @@ module App =
                 Html.button [prop.text "OK"; prop.onClick (thunk1 dispatch ClearError)]
                 Html.button [prop.text "Start over"; prop.onClick (fun _ -> dispatch ClearError; dispatch (SetPage Home))]
                 ]
-        | _ when model.execution = InProgress ->
+        | None, Home when model.execution = InProgress ->
             class' "slideFromTop" Html.div [
                 Html.div "Executing..."
                 class' "busy" Html.div [
