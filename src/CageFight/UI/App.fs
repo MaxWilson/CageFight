@@ -33,7 +33,7 @@ module App =
         page: Page
         fightSetup: FightSetup
         database : MonsterDatabase
-        execution: Awaitable<FightResult>
+        execution: Awaitable<FightSetup * FightResult>
         }
     type Side = SideA | SideB
     type Msg =
@@ -42,7 +42,7 @@ module App =
         | Clear of Side
         | Upsert of Creature
         | SetPage of Page
-        | Fight of FightResult Awaitable
+        | Fight of (FightSetup * FightResult) Awaitable
     let update msg model =
         match msg with
         | ChangeFight f -> { model with fightSetup = f model.fightSetup }, Cmd.Empty
@@ -92,14 +92,14 @@ module App =
                     match calibrate model.database.catalog
                             model.fightSetup.sideA
                             (name, min, max) with
-                    | Some minQuantity, Some maxQuantity, Some sampleMaxFight ->
-                        Completed(CalibratedResult(minQuantity, maxQuantity, sampleMaxFight)) |> Fight |> dispatch
+                    | minQuantity, maxQuantity, Some sampleMaxFight ->
+                        Completed(model.fightSetup, CalibratedResult(minQuantity, maxQuantity, sampleMaxFight)) |> Fight |> dispatch
                     | v ->
                         Fight NotStarted |> dispatch
                         Error "Failed to find a number of monsters that would satisfy those constraints. Try a wider range like 20% to 100%" |> dispatch
                 | Specific(sideB) ->
-                    specificFight model.database.catalog model.fightSetup.sideA sideB
-                        |> SpecificResult
+                    let fightResult = specificFight model.database.catalog model.fightSetup.sideA sideB
+                    (model.fightSetup, SpecificResult fightResult)
                         |> Completed
                         |> Fight
                         |> dispatch
@@ -387,10 +387,40 @@ module App =
                         Html.button [prop.text "Execute"; prop.onClick (thunk2 beginFights model dispatch)]
                         match model.execution with
                         | NotStarted | InProgress -> ()
-                        | Completed _ ->
-                            class' "statistics" Html.div [
-                                Html.div "3 peshkalis wins 50-80% of the time against 14-17 orcs"
-                                ]
+                        | Completed (setup, result) ->
+                            let db = model.database
+                            let teamToTxt team =
+                                team
+                                |> List.map (
+                                    function
+                                    | (1, name) -> name
+                                    | (n, name) -> $"{n} {db.catalog[name].PluralName_}")
+                                |> String.oxfordJoin
+                            match result with
+                            | SpecificResult (combat, victors) ->
+                                match victors.victors with
+                                | [1] ->
+                                    Html.div $"Team One wins!"
+                                | [2] ->
+                                    Html.div $"Team Two wins!"
+                                | [] ->
+                                    Html.div $"Everybody dies!"
+                                | _ ->
+                                    Html.div $"Stalemate!"
+                            | CalibratedResult(minQuantity, maxQuantity, sampleCombat) ->
+                                let name, min, max = match setup.sideB with Calibrate(Some name, min, max) -> name, min, max | _ -> shouldntHappen()
+                                let min = defaultArg min 50
+                                let max = defaultArg max 80
+                                class' "statistics" Html.div [
+                                    let quantityDescription =
+                                        match minQuantity, maxQuantity with
+                                        | Some n, Some m when n = m -> $"{n}"
+                                        | Some n, None -> $"{n} or more"
+                                        | None, Some n -> $"{n} or fewer"
+                                        | Some n, Some m -> $"{n} to {m}"
+                                        | None, None -> "an unknown number of"
+                                    Html.div $"{setup.sideA |> teamToTxt} wins {min}%%-{max}%% of the time against {quantityDescription} {db.catalog[name].PluralName_}"
+                                    ]
                             class' "fightLog" Html.div [
                                 Html.div "Peshkali hits orc 1, blahblahblah"
                                 Html.button [prop.text "<<"]

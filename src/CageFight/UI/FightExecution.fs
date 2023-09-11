@@ -99,7 +99,7 @@ module CombatEvents =
         | Info _ -> model
 
 type FightResult =
-    | CalibratedResult of lower:int * upper:int * sample:Combat
+    | CalibratedResult of lower:int option * upper:int option * sample:Combat
     | SpecificResult of Combat * {| victors: int list |}
 
 let tryFindTarget (combat: Combat) (attacker: Combatant) =
