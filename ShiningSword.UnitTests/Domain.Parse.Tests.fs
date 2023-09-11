@@ -52,6 +52,30 @@ let AcceptanceTests() = testLabel "Acceptance tests" <| testList "Parsing" [
         verify "DX" <@ creature.Value.DX.Value = 12 @>
         verify "Skill, computed damage" <@ weaponStats creature.Value = (22, RollSpec.create(3,6,+7), Cutting)  @>
         ]
+    testList "Peshkali" [
+        let verify, pverify = makeVerify()
+        let creature = lazy(
+            parse (|Creature|_|) "Peshkali [Peshkalir]: ST 20 DX 12 IQ 14 HT 15 DR 4 HP 22 Speed 6 Weapon Master Skill 22 sw+1 cut Dodge 10 Parry 13 Extra Attack 5 Extra Parry 5"
+            )
+        verify "Name" <@ creature.Value.name = "Peshkali" @>
+        verify "Name" <@ creature.Value.PluralName_ = "Peshkalir" @>
+        verify "ST" <@ creature.Value.ST_ = 20 @>
+        verify "DX" <@ creature.Value.DX_ = 12 @>
+        verify "IQ" <@ creature.Value.IQ_ = 14 @>
+        verify "HT" <@ creature.Value.HT_ = 15 @>
+        verify "DR" <@ creature.Value.DR_ = 4 @>
+        verify "HP" <@ creature.Value.HP_ = 22 @>
+        verify "Speed" <@ creature.Value.Speed_ = 6.0 @>
+        verify "WeaponMaster" <@ creature.Value.WeaponMaster = true @>
+        verify "WeaponSkill" <@ creature.Value.WeaponSkill = Some 22 @>
+        verify "Damage" <@ creature.Value.Damage_ = RollSpec.create(3,6,+9) @>
+        verify "DamageType" <@ creature.Value.DamageType = Some Cutting @>
+        verify "Dodge" <@ creature.Value.Dodge_ = 10 @>
+        verify "Parry" <@ creature.Value.Parry = Some 13 @>
+        verify "Block" <@ creature.Value.Block = None @>
+        verify "ExtraAttack" <@ creature.Value.ExtraAttack_ = 5 @>
+        verify "ExtraParry" <@ creature.Value.ExtraParry_ = 5 @>
+        ]
     testList "Tiger" [
         let verify, pverify = makeVerify()
         let creature = lazy(
@@ -60,6 +84,6 @@ let AcceptanceTests() = testLabel "Acceptance tests" <| testList "Parsing" [
         verify "Name" <@ creature.Value.name = "Tiger" @>
         verify "ST" <@ creature.Value.ST.Value = 13 @>
         verify "DX" <@ creature.Value.DX.Value = 15 @>
-        verify "Skill, computed damage" <@ weaponStats creature.Value = (16, RollSpec.create(2,6,-1), Impaling)  @>
+        verify "Skill, computed damage" <@ creature.Value.WeaponSkill = Some 16 && creature.Value.Damage_ = RollSpec.create(2,6,-1) && creature.Value.DamageType = Some Impaling  @>
         ]
     ]

@@ -142,6 +142,21 @@ module App =
                 | Some v -> updateTxt (render v)
                 | None -> updateTxt "")
             ]
+    let editDataNoHint<'t> (propType: IReactProperty, render: 't -> string, parser: string -> 't option) (label:string) (value: 't option, update: 't option -> unit) =
+        let txt, updateTxt = React.useState (match value with Some v -> render v | None -> "")
+        labeled label <| Html.input [
+            prop.valueOrDefault txt
+            propType
+            if propType = prop.type'.number then
+                prop.max 99
+            prop.onChange updateTxt
+            prop.onBlur (fun _ ->
+                let v = parser txt
+                update v
+                match v with
+                | Some v -> updateTxt (render v)
+                | None -> updateTxt "")
+            ]
     let editDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:string) (hint: 't) (value: 't option, options, update: 't option -> unit) =
         labeled label <| Html.select [
             match value with
@@ -193,6 +208,7 @@ module App =
         let stats, update = React.useState stats
         let editString = editData<string>(prop.type'.text, toString, (fun (txt: string) -> if String.isntWhitespace txt then Some txt else None))
         let editNumber = editData(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
+        let editNumberNoHint = editDataNoHint(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
         let editDecimalNumber = editData(prop.type'.number, (fun v -> $"%.2f{v}"), (fun (input: string) -> match System.Double.TryParse input with true, n -> Some n | _ -> None))
         let editDamageType = editDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
         let editBool label (value: bool, update) =
@@ -208,12 +224,18 @@ module App =
             editNumber "DX" stats.DX_ (stats.DX, (fun n -> { stats with DX = n } |> update))
             editNumber "IQ" stats.IQ_ (stats.IQ, (fun n -> { stats with IQ = n } |> update))
             editNumber "HT" stats.HT_ (stats.HT, (fun n -> { stats with HT = n } |> update))
+            editNumber "DR" stats.DR_ (stats.DR, (fun n -> { stats with DR = n } |> update))
             editNumber "HP" stats.HP_ (stats.HP, (fun n -> { stats with HP = n } |> update))
             editDecimalNumber "Speed" stats.Speed_ (stats.Speed, (fun n -> { stats with Speed = n } |> update))
+            editNumber "Dodge" stats.Dodge_ (stats.Dodge, (fun n -> { stats with Dodge = n } |> update))
+            editNumberNoHint "Parry" (stats.Parry, (fun n -> { stats with Parry = n } |> update))
+            editNumberNoHint "Block" (stats.Block, (fun n -> { stats with Block = n } |> update))
             editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
             editNumber "Weapon Skill" 10 (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
             editDamage "Damage" stats update
             editDamageType "Damage type" DamageType.Other (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Other], (fun v -> { stats with DamageType = v } |> update))
+            editNumber "Extra Attacks" stats.ExtraAttack_ (stats.ExtraAttack, (fun n -> { stats with ExtraAttack = n } |> update))
+            editNumber "Extra Parries" stats.ExtraParry_ (stats.ExtraParry, (fun n -> { stats with ExtraParry = n } |> update))
 
             Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
             Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home))]

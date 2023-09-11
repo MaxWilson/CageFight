@@ -31,6 +31,12 @@ module Core =
         IQ: int prop
         HT: int prop
         HP: int prop
+        DR: int prop
+        Dodge: int prop
+        Parry: int prop
+        Block: int prop
+        ExtraAttack: int prop
+        ExtraParry: int prop
         Speed: float prop
         WeaponMaster: bool
         WeaponSkill: int prop
@@ -51,6 +57,12 @@ module Core =
               WeaponSkill = None
               Damage = None
               DamageType = None
+              DR = None
+              Dodge = None
+              Parry = None
+              Block = None
+              ExtraAttack = None
+              ExtraParry = None
               }
         // "_" means "defaulted" in the sense that it's the value that will be used if the property is not set.
         member this.PluralName_ = defaultArg this.pluralName (this.name + "s")
@@ -60,6 +72,12 @@ module Core =
         member this.HT_ = defaultArg this.HT 10
         member this.HP_ = defaultArg this.HP this.ST_
         member this.Speed_ = defaultArg this.Speed ((this.DX_ + this.HT_ |> float) / 4.)
+        member this.DR_ = defaultArg this.DR 0
+        member this.Dodge_ = defaultArg this.Dodge ((this.Speed_ |> int) + 3)
+        // notice: Parry and Block do not exist by default
+        member this.ExtraAttack_ = defaultArg this.ExtraAttack 0
+        member this.ExtraParry_ = defaultArg this.ExtraParry 0
+
         member this.Damage_ =
             let addWeaponMasterDamage = function
                 | RollSpec(n, d, rest) as roll when this.WeaponMaster ->
@@ -115,10 +133,16 @@ module Parser =
         | OWSStr "IQ" (Int (v, rest)) -> Some((fun c -> { c with IQ = Some v }), rest)
         | OWSStr "HT" (Int (v, rest)) -> Some((fun c -> { c with HT = Some v }), rest)
         | OWSStr "HP" (Int (v, rest)) -> Some((fun c -> { c with HP = Some v }), rest)
+        | OWSStr "DR" (Int (v, rest)) -> Some((fun c -> { c with DR = Some v }), rest)
         | OWSStr "Speed" (Int (v, rest)) -> Some((fun c -> { c with Speed = Some v }), rest)
+        | OWSStr "Dodge" (Int (v, rest)) -> Some((fun c -> { c with Dodge = Some v }), rest)
+        | OWSStr "Parry" (Int (v, rest)) -> Some((fun c -> { c with Parry = Some v }), rest)
+        | OWSStr "Block" (Int (v, rest)) -> Some((fun c -> { c with Block = Some v }), rest)
         | OWSStr "Weapon Master" rest -> Some((fun c -> { c with WeaponMaster = true }), rest)
         | OWSStr "Skill" (Int (v, rest)) -> Some((fun c -> { c with WeaponSkill = Some v }), rest)
         | DamageOverall((damage, damageType), rest) -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType }), rest)
+        | OWSStr "Extra Attack" (Int (v, rest)) -> Some((fun c -> { c with ExtraAttack = Some v }), rest)
+        | OWSStr "Extra Parry" (Int (v, rest)) -> Some((fun c -> { c with ExtraParry = Some v }), rest)
         | _ -> None
     let rec (|CreatureProperties|_|) = pack <| function
         | CreatureProperties(fprops, CreatureProperty(fprop, rest)) -> Some(fprops >> fprop, rest)
@@ -140,11 +164,11 @@ module Defaults =
     let database() =
         [
             let parse (input: string) = match ParseArgs.Init input with | Parser.Creature(c, End) -> c | _ -> shouldntHappen input
-            parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 Skill 18 sw+1 cut"
-            parse "Orc: ST 12 DX 11 IQ 9 HT 11 HP 14 Skill 13 1d+3 cut"
-            parse "Ogre: ST 20 DX 11 IQ 7 HT 13 Skill 16 3d+7 cr"
+            parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 DR 4 Skill 18 sw+1 cut Extra Attack 5 Extra Parry 5 Parry 13 Dodge 10"
+            parse "Orc: ST 12 DX 11 IQ 9 HT 11 DR 2 HP 14 Dodge 7 Parry 9 Block 9 Skill 13 sw+1 cut"
+            parse "Ogre: ST 20 DX 11 IQ 7 HT 13 Skill 16 3d+7 cr Parry 11 DR 3"
             parse "Slugbeast: ST 16 IQ 2 Skill 12 1d+2"
-            parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp"
+            parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp DR 2 Speed 8 Parry 10 Block 10"
             ]
         |> List.map(fun c -> c.name, c)
         |> Map.ofList
