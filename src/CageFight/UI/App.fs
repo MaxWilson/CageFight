@@ -74,9 +74,10 @@ module App =
     let beginFights (model: Model) dispatch =
         Fight InProgress |> dispatch
         async {
-            do! Async.Sleep 1000
+            for x in 1..100000 do
+                printfn "%A" x
             Fight NotStarted |> dispatch // todo: produce a result instead of just going back to NotStarted
-            } |> Async.Start |> ignore
+            } |> Async.StartImmediate |> ignore
 
     let [<ReactComponent>] monsterPicker (db: MonsterDatabase, noMonstersSelectedYet) (clickLabel: string, onClick, side, dispatch) (monsterDetails: ReactElement) =
         let namePrefix, update = React.useState ""
