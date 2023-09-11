@@ -206,6 +206,14 @@ module App =
                 Html.button [prop.text "OK"; prop.onClick (thunk1 dispatch ClearError)]
                 Html.button [prop.text "Start over"; prop.onClick (fun _ -> dispatch ClearError; dispatch (SetPage Home))]
                 ]
+        | _ when model.execution = InProgress ->
+            class' "slideFromTop" Html.div [
+                Html.div "Executing..."
+                class' "busy" Html.div [
+                    for _ in 1..10 do
+                        class' "wave" Html.div []
+                    ]
+                ]
         | None, Editing name -> editView name model.database dispatch
         | None, Home ->
             Html.div [
@@ -337,15 +345,7 @@ module App =
                             ]
                         Html.button [prop.text "Execute"; prop.onClick (thunk2 beginFights model dispatch)]
                         match model.execution with
-                        | InProgress ->
-                            Html.div "Executing..."
-                            Html.div [
-                                prop.className "busy"
-                                prop.children [
-                                    for _ in 1..10 do
-                                        class' "wave" Html.div []
-                                    ]
-                                ]
+                        | InProgress -> ()
                         | NotStarted | Completed _ ->
                             class' "statistics" Html.div [
                                 Html.div "3 peshkalis wins 50-80% of the time against 14-17 orcs"

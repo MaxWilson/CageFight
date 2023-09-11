@@ -64,6 +64,15 @@ body
     .editDamage input
         max-width: 80px
 
+.slideFromTop
+    animation: fromTop 0.5s ease-in-out
+
+@keyframes fromTop
+  0%
+    transform: translateY(-100%)
+  100%
+    transform: translateY(0)
+
 .busy
     height: 30vh
     display: flex
