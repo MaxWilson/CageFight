@@ -78,6 +78,7 @@ module App =
             let g = System.Guid.NewGuid()
             Fight InProgress |> dispatch
             async {
+                do! Async.Sleep 100 // force async to yield long enough for the busy animation to show up--I'm not sure why but it doesn't happen sometimes otherwise
                 match model.fightSetup.sideB with
                 | _ when (model.fightSetup.sideA |> List.sumBy fst) = 0 ->
                     Fight NotStarted |> dispatch
@@ -359,9 +360,23 @@ module App =
                                                 editLink None name
                                                 Html.text "should lose"
                                                 class' "calibrationRange" Html.span [
-                                                    Html.input [prop.type'.number; prop.placeholder (defaultArg min 50 |> toString); prop.max 99; match min with Some min -> prop.valueOrDefault min | None -> ()]
+                                                    let changeMin (txt: string) =
+                                                        let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
+                                                        ChangeFight (fun fight -> { fight with sideB = Calibrate(Some name, v, max) }) |> dispatch
+                                                    let changeMax (txt: string) =
+                                                        let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
+                                                        ChangeFight (fun fight -> { fight with sideB = Calibrate(Some name, min, v) }) |> dispatch
+                                                    Html.input [
+                                                        prop.type'.number; prop.placeholder (defaultArg min 50 |> toString)
+                                                        prop.onChange changeMin; prop.max 99
+                                                        match min with Some min -> prop.valueOrDefault min | None -> ()
+                                                        ]
                                                     Html.text "% to "
-                                                    Html.input [prop.type'.number; prop.placeholder (defaultArg min 80 |> toString); prop.max 99; match max with Some max -> prop.valueOrDefault max | None -> ()]
+                                                    Html.input [
+                                                        prop.type'.number; prop.placeholder (defaultArg max 80 |> toString)
+                                                        prop.onChange changeMax; prop.max 99
+                                                        match max with Some max -> prop.valueOrDefault max | None -> ()
+                                                        ]
                                                     Html.text "% of the time"
                                                     ]
                                                 ]
