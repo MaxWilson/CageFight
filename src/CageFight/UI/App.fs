@@ -88,7 +88,7 @@ module App =
                     dispatch (Error "You have to pick monsters first")
                 | Calibrate(Some name, min, max) ->
                     let min = (defaultArg min 50 |> float) / 100.
-                    let max = (defaultArg max 80 |> float) / 100.
+                    let max = (defaultArg max 90 |> float) / 100.
                     match calibrate model.database.catalog
                             model.fightSetup.sideA
                             (name, min, max) with
@@ -373,7 +373,7 @@ module App =
                                                         ]
                                                     Html.text "% to "
                                                     Html.input [
-                                                        prop.type'.number; prop.placeholder (defaultArg max 80 |> toString)
+                                                        prop.type'.number; prop.placeholder (defaultArg max 90 |> toString)
                                                         prop.onChange changeMax; prop.max 99
                                                         match max with Some max -> prop.valueOrDefault max | None -> ()
                                                         ]
@@ -410,7 +410,7 @@ module App =
                             | CalibratedResult(minQuantity, maxQuantity, sampleCombat) ->
                                 let name, min, max = match setup.sideB with Calibrate(Some name, min, max) -> name, min, max | _ -> shouldntHappen()
                                 let min = defaultArg min 50
-                                let max = defaultArg max 80
+                                let max = defaultArg max 90
                                 class' "statistics" Html.div [
                                     let quantityDescription =
                                         match minQuantity, maxQuantity with
