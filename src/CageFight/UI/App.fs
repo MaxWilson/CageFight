@@ -284,10 +284,8 @@ module App =
                     if newIndex >= 0 && newIndex < combatLog.Length then
                         setCurrentIndex newIndex
                         setCombat (combatLog.[newIndex] |> snd)
-                Html.button [prop.text "<<"]
                 Html.button [prop.text "<"; prop.onClick (changeIndex -1)]
                 Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
-                Html.button [prop.text ">>"]
                 Html.span [
                     Html.text "Show rolls"
                     Html.input [prop.type'.checkbox; prop.isChecked showRolls; prop.onCheckedChange setShowRolls]
@@ -301,7 +299,9 @@ module App =
                     | None -> header "Combat begins"
                     | Some msg ->
                         let viewDetails details =
-                            classTxt' "details" Html.span $" {details}"
+                            if showRolls then
+                                classTxt' "details" Html.span $" {details}"
+                            else React.fragment []
                         let name = function
                             | (1, name) -> classTxt' "blueName" Html.span name
                             | (2, name) -> classTxt' "redName" Html.span name
