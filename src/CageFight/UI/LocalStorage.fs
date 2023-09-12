@@ -31,7 +31,7 @@ open Cache
 
 module Catalog =
     open Domain
-    let key = "Stats"
+    let key = "Catalog"
     let cacheRead, cacheInvalidate = Cache.create()
     let read (): Map<string, Creature> =
         cacheRead (read key) (Domain.Defaults.database)
