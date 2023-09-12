@@ -450,7 +450,7 @@ module App =
                                 team
                                 |> List.map (
                                     function
-                                    | (1, name) -> name
+                                    | (1, name) -> $"1 {name}"
                                     | (n, name) -> $"{n} {db.catalog[name].PluralName_}")
                                 |> String.oxfordJoin
                             match result with
@@ -472,12 +472,13 @@ module App =
                                 class' "statistics" Html.div [
                                     let quantityDescription =
                                         match minQuantity, maxQuantity with
-                                        | Some n, Some m when n = m -> $"{n}"
-                                        | Some n, None -> $"{n} or more"
-                                        | None, Some n -> $"{n} or fewer"
-                                        | Some n, Some m -> $"{n} to {m}"
-                                        | None, None -> "an unknown number of"
-                                    Html.div $"{setup.sideA |> teamToTxt} wins {min}%%-{max}%% of the time against {quantityDescription} {db.catalog[name].PluralName_}"
+                                        | Some 1, Some 1 -> $"1 {db.catalog[name].name}"
+                                        | Some n, Some m when n = m -> $"{n} {db.catalog[name].PluralName_}"
+                                        | Some n, None -> $"{n} or more {db.catalog[name].PluralName_}"
+                                        | None, Some n -> $"{n} or fewer {db.catalog[name].PluralName_}"
+                                        | Some n, Some m -> $"{n} to {m} {db.catalog[name].PluralName_}"
+                                        | None, None -> $"an unknown number of {db.catalog[name].PluralName_}"
+                                    Html.div $"{setup.sideA |> teamToTxt} wins {min}%%-{max}%% of the time against {quantityDescription}"
                                     ]
                                 viewCombat (setup, sampleCombat) dispatch
                         ]
