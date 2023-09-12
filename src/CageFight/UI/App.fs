@@ -241,44 +241,90 @@ module App =
             Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home))]
             ]
 
+    [<ReactComponent>]
     let viewCombat (setup, combatLog: CombatLog) dispatch =
+        let showRolls, setShowRolls = React.useState true
         let combat = combatLog |> List.last |> snd // todo: use the whole combat, not just the final state
         class' "combat" Html.div [
-            Html.table [
-                Html.thead [
-                    Html.tr [
-                        Html.th "Name"
-                        Html.th "HP"
-                        Html.th "Condition"
+            class' "statusTable" Html.div [
+                Html.table [
+                    Html.thead [
+                        Html.tr [
+                            Html.th "Name"
+                            Html.th "HP"
+                            Html.th "Condition"
+                            ]
+                        ]
+                    Html.tbody [
+                        for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.stats.name, c.number) do
+                            class' (if c.team = 1 then "teamBlue" else "teamRed") Html.tr [
+                                Html.td c.personalName
+                                Html.td c.CurrentHP_
+                                Html.td (
+                                    if c.statusMods |> List.contains Dead then
+                                        classTxt' "statusDead" Html.span "Dead"
+                                    elif c.statusMods |> List.contains Unconscious then
+                                        classTxt' "statusDead" Html.span "Unconscious"
+                                    else
+                                        match c.statusMods with
+                                        | [] ->
+                                            classTxt' "statusOk" Html.span "OK"
+                                        | mods ->
+                                            let txt: string = mods |> List.distinct |> List.map toString |> List.sort |> String.join ", "
+                                            classTxt' "statusDisabled" Html.span txt
+                                    )
+                                ]
                         ]
                     ]
-                Html.tbody [
-                    for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.stats.name, c.number) do
-                        class' (if c.team = 1 then "teamBlue" else "teamRed") Html.tr [
-                            Html.td c.personalName
-                            Html.td c.CurrentHP_
-                            Html.td (
-                                if c.statusMods |> List.contains Dead then
-                                    classTxt' "statusDead" Html.span "Dead"
-                                elif c.statusMods |> List.contains Unconscious then
-                                    classTxt' "statusDead" Html.span "Unconscious"
-                                else
-                                    match c.statusMods with
-                                    | [] ->
-                                        classTxt' "statusOk" Html.span "OK"
-                                    | mods ->
-                                        let txt: string = mods |> List.distinct |> List.map toString |> List.sort |> String.join ", "
-                                        classTxt' "statusDisabled" Html.span txt
-                                )
-                            ]
-                    ]
                 ]
-            Html.div [
+            class' "logButtons" Html.div [
                 Html.button [prop.text "<<"]
                 Html.button [prop.text "<"]
                 Html.button [prop.text ">"]
                 Html.button [prop.text ">>"]
-                Html.div "Peshkali hits orc 1, blahblahblah"
+                Html.span [
+                    Html.text "Show rolls"
+                    Html.input [prop.type'.checkbox; prop.isChecked showRolls; prop.onCheckedChange setShowRolls]
+                    ]
+                ]
+            class' "logEntries" Html.div [
+                for msg, state in combatLog do
+                    match msg with
+                    | None -> Html.h3 "Combat begins"
+                    | Some msg ->
+                        let viewDetails details =
+                            classTxt' "details" Html.span $" {details}"
+                        let name = function
+                            | (1, name) -> classTxt' "blueName" Html.span name
+                            | (2, name) -> classTxt' "redName" Html.span name
+                            | _ -> shouldntHappen()
+                        match msg with
+                        | Hit (ids, _, injury, statusImpact, rollDetails) ->
+                            let hit verb =
+                                Html.div [name ids.attacker; Html.text $" {verb} "; name ids.target; Html.text $" with a hit for {injury} HP"; viewDetails rollDetails]
+                            match statusImpact with
+                            | v when v |> List.contains Dead -> hit "kills"
+                            | v when v |> List.contains Unconscious -> hit "KOs"
+                            | v when v |> List.contains Stunned -> hit "stuns"
+                            | _ -> hit "hits"
+                        | SuccessfulDefense(ids, { defense = Parry }, rollDetails) ->
+                            Html.div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who parries"; viewDetails rollDetails]
+                        | SuccessfulDefense(ids, { defense = Block }, rollDetails) ->
+                            Html.div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who blocks"; viewDetails rollDetails]
+                        | SuccessfulDefense(ids, { defense = Dodge }, rollDetails) ->
+                            Html.div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who dodges"; viewDetails rollDetails]
+                        | Miss (ids, rollDetails) ->
+                            Html.div [name ids.attacker; Html.text " misses "; name ids.target; viewDetails rollDetails]
+                        | FallUnconscious(id, rollDetails) ->
+                            Html.div [name id; Html.text " falls unconscious "; viewDetails rollDetails]
+                        | Unstun(id, rollDetails) ->
+                            Html.div [name id; Html.text " recovers from stun "; viewDetails rollDetails]
+                        | StandUp(id, rollDetails) ->
+                            Html.div [name id; Html.text " stands up "; viewDetails rollDetails]
+                        | Info (id, msg) ->
+                            Html.div [name id; Html.text $" {msg}"]
+                        | NewRound n ->
+                            Html.h3 [Html.text $"Round {n} starts"]
                 ]
             ]
 

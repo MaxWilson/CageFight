@@ -58,6 +58,38 @@ body
             margin-left: 3px
             margin-right: 3px
     .combat
+        display: grid
+        grid-template-columns: auto 1fr
+        grid-template-areas: "statusTable logButtons" "statusTable logEntries"
+        .statusTable
+            grid-area: statusTable
+            max-height: 60vh
+            overflow-y: auto
+            min-width: 25vw
+        .logButtons
+            grid-area: logButtons
+            button
+                margin: 5px
+                margin-right: 10px
+            input[type="checkbox"]
+                position: relative
+                top: 2px
+                left: 5px
+        .logEntries
+            grid-area: logEntries
+            max-height: calc(60vh - 30px)
+            overflow-y: auto
+            .details
+                margin-left: 8px
+                font-size: 0.8em
+            div
+                margin-bottom: 4px
+        .redName
+            color: red
+            font-weight: bold
+        .blueName
+            color: blue
+            font-weight: bold
         .teamRed
             background-color: lightpink
         .teamBlue
