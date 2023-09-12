@@ -128,7 +128,7 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
     potentialTargets |> Seq.tryHead
 
 let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
-    for c in cqrs.State.combatants.Values |> Seq.sortBy (fun c -> c.stats.Speed_, c.stats.DX_, c.personalName) |> Seq.map (fun c -> c.Id) do
+    for c in cqrs.State.combatants.Values |> Seq.sortBy (fun c -> c.stats.Speed_, c.stats.DX_, c.stats.name, c.number) |> Seq.map (fun c -> c.Id) do
         let d = RollSpec.create(3,6)
         let attackRoll = d.roll()
         let mutable msg = ""
@@ -148,28 +148,31 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
 
         let self = cqrs.State.combatants[c]
         if self.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
-            let cmd =
-                if self.CurrentHP_ <= 0 && checkGoesUnconscious self 0 then
-                    FallUnconscious(self.Id, msg)
-                elif self.statusMods |> List.exists ((=) Stunned) then
-                    if attempt "Recover from stun" self.stats.HT_ then
-                        Unstun(self.Id, msg)
-                    else
-                        Info(self.Id, msg)
-                elif self.statusMods |> List.exists ((=) Prone) then
-                    StandUp(self.Id, msg)
+            if self.CurrentHP_ <= 0 && checkGoesUnconscious self 0 then
+                FallUnconscious(self.Id, msg)
+                |> cqrs.Execute
+            elif self.statusMods |> List.exists ((=) Stunned) then
+                if attempt "Recover from stun" self.stats.HT_ then
+                    Unstun(self.Id, msg)
                 else
+                    Info(self.Id, msg)
+                |> cqrs.Execute
+            elif self.statusMods |> List.exists ((=) Prone) then
+                StandUp(self.Id, msg)
+                |> cqrs.Execute
+            else
+                for n in 1..(self.stats.ExtraAttack_ + 1) do
                     match self |> tryFindTarget cqrs.State with
                     | Some victim ->
                         if attempt "Attack" (defaultArg self.stats.WeaponSkill 10) then
                             let defenseRoll = d.roll()
-                            let dodgeTarget, retreat = if victim.retreatUsed then int victim.stats.Speed_, false else (3 + int victim.stats.Speed_), true
+                            let dodgeTarget, retreat = if victim.retreatUsed then int victim.stats.Dodge_, false else (3 + int victim.stats.Dodge_), true
                             let defense = { defense = Dodge; targetRetreated = retreat }
                             if attempt (if retreat then "Dodge and retreat" else "Dodge") dodgeTarget then
                                 SuccessfulDefense({ attacker = self.Id; target = victim.Id }, defense, msg)
                             else
                                 let dmg = self.stats.Damage_.roll()
-                                let penetratingDmg = dmg // todo: account for DR
+                                let penetratingDmg = dmg - victim.stats.DR_
                                 let injury = match self.stats.DamageType with
                                                 | Some Cutting -> (float penetratingDmg * 1.5) |> int
                                                 | Some Impaling -> penetratingDmg * 2
@@ -193,7 +196,8 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                     | None ->
                         recordMsg "can't find a victim"
                         Info(self.Id, msg)
-            cqrs.Execute cmd
+                    |> cqrs.Execute
+
 
 let fight (cqrs: CQRS.CQRS<_,Combat>) =
     let rec loop counter =

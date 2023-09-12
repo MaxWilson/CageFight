@@ -253,7 +253,7 @@ module App =
                         ]
                     ]
                 Html.tbody [
-                    for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.personalName) do
+                    for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.stats.name, c.number) do
                         class' (if c.team = 1 then "teamBlue" else "teamRed") Html.tr [
                             Html.td c.personalName
                             Html.td c.CurrentHP_
@@ -262,10 +262,11 @@ module App =
                                     classTxt' "statusDead" Html.span "Dead"
                                 elif c.statusMods |> List.contains Unconscious then
                                     classTxt' "statusDead" Html.span "Unconscious"
-                                else match c.statusMods with
-                                     | [] ->
+                                else
+                                    match c.statusMods with
+                                    | [] ->
                                         classTxt' "statusOk" Html.span "OK"
-                                     | mods ->
+                                    | mods ->
                                         let txt: string = mods |> List.distinct |> List.map toString |> List.sort |> String.join ", "
                                         classTxt' "statusDisabled" Html.span txt
                                 )
