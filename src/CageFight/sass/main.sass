@@ -65,7 +65,8 @@ body
             grid-area: statusTable
             max-height: 60vh
             overflow-y: auto
-            min-width: 25vw
+            table
+                min-width: 25vw
         .logButtons
             grid-area: logButtons
             button
@@ -84,6 +85,8 @@ body
                 font-size: 0.8em
             div
                 margin-bottom: 4px
+            .selected
+                background-color: lightgrey
         .redName
             color: red
             font-weight: bold

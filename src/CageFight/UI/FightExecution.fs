@@ -51,7 +51,7 @@ module CombatEvents =
         | FallUnconscious of CombatantId * string
         | Unstun of CombatantId * string
         | StandUp of CombatantId * string
-        | Info of CombatantId * string
+        | Info of CombatantId * msg: string * rollInfo: string
         | NewRound of int
     let update msg model =
         let updateCombatant id (f: Combatant -> Combatant) model =
@@ -146,7 +146,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                 false
         let checkGoesUnconscious (self: Combatant) incomingDamage =
             let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
-            attempt "Stay conscious" (self.stats.HT_ - penalty)
+            attempt "Stay conscious" (self.stats.HT_ - penalty) |> not
         let mutable doneEarly = false
         let self = cqrs.State.combatants[c]
         if self.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
@@ -157,7 +157,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                 if attempt "Recover from stun" self.stats.HT_ then
                     Unstun(self.Id, msg)
                 else
-                    Info(self.Id, msg)
+                    Info(self.Id, "does nothing", msg)
                 |> cqrs.Execute
             elif self.statusMods |> List.exists ((=) Prone) then
                 StandUp(self.Id, msg)
@@ -197,9 +197,8 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                             else
                                 Miss({ attacker = self.Id; target = victim.Id }, msg)
                         | None ->
-                            recordMsg "can't find a victim"
                             doneEarly <- true
-                            Info(self.Id, msg)
+                            Info(self.Id, "can't find a victim", msg)
                         |> cqrs.Execute
                         msg <- "" // if multiple attacks process we don't want to redisplay the same text
 

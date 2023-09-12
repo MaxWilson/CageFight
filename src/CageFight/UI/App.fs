@@ -244,7 +244,8 @@ module App =
     [<ReactComponent>]
     let viewCombat (setup, combatLog: CombatLog) dispatch =
         let showRolls, setShowRolls = React.useState true
-        let combat = combatLog |> List.last |> snd // todo: use the whole combat, not just the final state
+        let combat, setCombat = React.useState (combatLog |> List.last |> snd)
+        let currentIndex, setCurrentIndex = React.useState 0
         class' "combat" Html.div [
             class' "statusTable" Html.div [
                 Html.table [
@@ -278,9 +279,14 @@ module App =
                     ]
                 ]
             class' "logButtons" Html.div [
+                let changeIndex delta _ =
+                    let newIndex = currentIndex + delta
+                    if newIndex >= 0 && newIndex < combatLog.Length then
+                        setCurrentIndex newIndex
+                        setCombat (combatLog.[newIndex] |> snd)
                 Html.button [prop.text "<<"]
-                Html.button [prop.text "<"]
-                Html.button [prop.text ">"]
+                Html.button [prop.text "<"; prop.onClick (changeIndex -1)]
+                Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
                 Html.button [prop.text ">>"]
                 Html.span [
                     Html.text "Show rolls"
@@ -288,9 +294,11 @@ module App =
                     ]
                 ]
             class' "logEntries" Html.div [
-                for msg, state in combatLog do
+                for (ix, (msg, state)) in combatLog |> List.mapi Tuple2.create do
+                    let header (txt:string) = Html.h3 [prop.text txt; prop.onClick (fun _ -> setCurrentIndex ix; setCombat state); if ix = currentIndex then prop.className "selected"]
+                    let div (children: ReactElement list) = Html.div [prop.children children; prop.onClick (fun _ -> setCurrentIndex ix; setCombat state); if ix = currentIndex then prop.className "selected"]
                     match msg with
-                    | None -> Html.h3 "Combat begins"
+                    | None -> header "Combat begins"
                     | Some msg ->
                         let viewDetails details =
                             classTxt' "details" Html.span $" {details}"
@@ -301,30 +309,30 @@ module App =
                         match msg with
                         | Hit (ids, _, injury, statusImpact, rollDetails) ->
                             let hit verb =
-                                Html.div [name ids.attacker; Html.text $" {verb} "; name ids.target; Html.text $" with a hit for {injury} HP"; viewDetails rollDetails]
+                                div [name ids.attacker; Html.text $" {verb} "; name ids.target; Html.text $" with a hit for {injury} HP"; viewDetails rollDetails]
                             match statusImpact with
                             | v when v |> List.contains Dead -> hit "kills"
                             | v when v |> List.contains Unconscious -> hit "KOs"
                             | v when v |> List.contains Stunned -> hit "stuns"
                             | _ -> hit "hits"
                         | SuccessfulDefense(ids, { defense = Parry }, rollDetails) ->
-                            Html.div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who parries"; viewDetails rollDetails]
+                            div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who parries"; viewDetails rollDetails]
                         | SuccessfulDefense(ids, { defense = Block }, rollDetails) ->
-                            Html.div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who blocks"; viewDetails rollDetails]
+                            div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who blocks"; viewDetails rollDetails]
                         | SuccessfulDefense(ids, { defense = Dodge }, rollDetails) ->
-                            Html.div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who dodges"; viewDetails rollDetails]
+                            div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who dodges"; viewDetails rollDetails]
                         | Miss (ids, rollDetails) ->
-                            Html.div [name ids.attacker; Html.text " misses "; name ids.target; viewDetails rollDetails]
+                            div [name ids.attacker; Html.text " misses "; name ids.target; viewDetails rollDetails]
                         | FallUnconscious(id, rollDetails) ->
-                            Html.div [name id; Html.text " falls unconscious "; viewDetails rollDetails]
+                            div [name id; Html.text " falls unconscious "; viewDetails rollDetails]
                         | Unstun(id, rollDetails) ->
-                            Html.div [name id; Html.text " recovers from stun "; viewDetails rollDetails]
+                            div [name id; Html.text " recovers from stun "; viewDetails rollDetails]
                         | StandUp(id, rollDetails) ->
-                            Html.div [name id; Html.text " stands up "; viewDetails rollDetails]
-                        | Info (id, msg) ->
-                            Html.div [name id; Html.text $" {msg}"]
+                            div [name id; Html.text " stands up "; viewDetails rollDetails]
+                        | Info (id, msg, rollDetails) ->
+                            div [name id; Html.text $" {msg}"; viewDetails rollDetails]
                         | NewRound n ->
-                            Html.h3 [Html.text $"Round {n} starts"]
+                            header $"Round {n} starts"
                 ]
             ]
 
