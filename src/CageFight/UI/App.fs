@@ -241,6 +241,18 @@ module App =
             Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home))]
             ]
 
+    let viewCombat _ dispatch =
+        class' "combat" Html.div [
+            Html.
+            Html.div "table placeholder"
+            Html.div [
+                Html.button [prop.text "<<"]
+                Html.button [prop.text "<"]
+                Html.button [prop.text ">"]
+                Html.button [prop.text ">>"]
+                Html.div "Peshkali hits orc 1, blahblahblah"
+                ]
+            ]
 
     let view (model: Model) dispatch =
         let class' (className: string) element (children: ReactElement list) =
@@ -429,6 +441,7 @@ module App =
                                     Html.div $"Everybody dies!"
                                 | _ ->
                                     Html.div $"Stalemate!"
+                                viewCombat (setup, combat) dispatch
                             | CalibratedResult(minQuantity, maxQuantity, sampleCombat) ->
                                 let name, min, max = match setup.sideB with Calibrate(Some name, min, max) -> name, min, max | _ -> shouldntHappen()
                                 let min = defaultArg min 50
@@ -443,13 +456,7 @@ module App =
                                         | None, None -> "an unknown number of"
                                     Html.div $"{setup.sideA |> teamToTxt} wins {min}%%-{max}%% of the time against {quantityDescription} {db.catalog[name].PluralName_}"
                                     ]
-                            class' "fightLog" Html.div [
-                                Html.div "Peshkali hits orc 1, blahblahblah"
-                                Html.button [prop.text "<<"]
-                                Html.button [prop.text "<"]
-                                Html.button [prop.text ">"]
-                                Html.button [prop.text ">>"]
-                                ]
+                                viewCombat (setup, sampleCombat) dispatch
                         ]
                     ]
                ]
