@@ -97,10 +97,10 @@ module CombatEvents =
             model |> updateCombatant id (fun c ->
                 { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
         | Info _ -> model
-
+type CombatLog = (Event option * Combat) list
 type FightResult =
-    | CalibratedResult of lower:int option * upper:int option * sample:Combat
-    | SpecificResult of Combat * {| victors: int list |}
+    | CalibratedResult of lower:int option * upper:int option * sample:CombatLog
+    | SpecificResult of CombatLog * {| victors: int list |}
 
 let tryFindTarget (combat: Combat) (attacker: Combatant) =
     let betweenInclusive (min, max) x = min <= x && x <= max
@@ -222,7 +222,7 @@ let createCombat (db: Map<string, Creature>) team1 team2 =
 let specificFight db team1 team2 =
     let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), update)
     let victors = fight cqrs
-    cqrs.State, victors
+    cqrs.LogWithMessages(), victors
 let calibrate db team1 (enemyType, minbound, maxbound) =
     let runForN n =
         let combat = createCombat db team1 [ n, enemyType ]
@@ -236,7 +236,7 @@ let calibrate db team1 (enemyType, minbound, maxbound) =
                 for run in 1..10 do
                     runForN n
                 ]
-            let sampleLog = (runs |> List.last |> fst).LogWithStates()
+            let sampleLog: CombatLog = (runs |> List.last |> fst).LogWithMessages()
             let victories = runs |> List.sumBy (function (_, v) when v.victors = [1] -> 1 | _ -> 0)
             results <- results |> Map.add n (victories, sampleLog)
             results[n]
@@ -257,5 +257,5 @@ let calibrate db team1 (enemyType, minbound, maxbound) =
     | inbounds ->
         let min = inbounds |> List.min
         let max = inbounds |> List.max
-        let sampleFight = get min |> snd |> List.head |> snd
+        let sampleFight: CombatLog = get min |> snd
         Some min, Some max, Some sampleFight

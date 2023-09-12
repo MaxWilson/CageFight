@@ -241,10 +241,37 @@ module App =
             Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home))]
             ]
 
-    let viewCombat _ dispatch =
+    let viewCombat (setup, combatLog: CombatLog) dispatch =
+        let combat = combatLog |> List.last |> snd // todo: use the whole combat, not just the final state
         class' "combat" Html.div [
-            Html.
-            Html.div "table placeholder"
+            Html.table [
+                Html.thead [
+                    Html.tr [
+                        Html.th "Name"
+                        Html.th "HP"
+                        Html.th "Condition"
+                        ]
+                    ]
+                Html.tbody [
+                    for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.personalName) do
+                        class' (if c.team = 1 then "teamBlue" else "teamRed") Html.tr [
+                            Html.td c.personalName
+                            Html.td c.CurrentHP_
+                            Html.td (
+                                if c.statusMods |> List.contains Dead then
+                                    classTxt' "statusDead" Html.span "Dead"
+                                elif c.statusMods |> List.contains Unconscious then
+                                    classTxt' "statusDead" Html.span "Unconscious"
+                                else match c.statusMods with
+                                     | [] ->
+                                        classTxt' "statusOk" Html.span "OK"
+                                     | mods ->
+                                        let txt: string = mods |> List.distinct |> List.map toString |> List.sort |> String.join ", "
+                                        classTxt' "statusDisabled" Html.span txt
+                                )
+                            ]
+                    ]
+                ]
             Html.div [
                 Html.button [prop.text "<<"]
                 Html.button [prop.text "<"]
@@ -255,11 +282,6 @@ module App =
             ]
 
     let view (model: Model) dispatch =
-        let class' (className: string) element (children: ReactElement list) =
-            element [prop.className className; prop.children children]
-        let classP' (className: string) element (props: IReactProperty list) =
-            element (prop.className className::props)
-
         match model.error, model.page with
         | Some error, _ ->
             class' "errorMsg" Html.div [
