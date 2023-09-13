@@ -102,6 +102,19 @@ type CombatLog = (Event option * Combat) list
 type FightResult =
     | CalibratedResult of lower:int option * upper:int option * sample:CombatLog
     | SpecificResult of CombatLog * {| victors: int list |}
+type Outcome = CritSuccess of int | Success of int | CritFail of int | Fail of int
+
+let successTest target x =
+    if x >= target + 10 then CritFail (x - target)
+    elif x = 17 then if target >= 16 then Fail(x - 16) else CritFail (x - 16)
+    elif x = 18 then CritFail (x - target)
+    elif target < 15 && x = 19 then Fail (x - target)
+    elif target < 14 && x = 20 then Fail (x - target)
+    elif x > target then Fail (x - target)
+    elif target >= 16 && x <= 6 then CritSuccess ((min target 6) - x)
+    elif target >= 15 && x <= 5 then CritSuccess ((min target 5) - x)
+    elif x <= 4 then CritSuccess ((min target 4) - x)
+    else Success (target - x)
 
 let prioritizeTargets (combat: Combat) (attacker: Combatant) =
     let betweenInclusive (min, max) x = min <= x && x <= max
@@ -174,15 +187,26 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
         let mutable msg = ""
         let recordMsg txt =
             if msg = "" then msg <- txt else msg <- $"{msg}; {txt}"
-        let attempt label targetNumber =
+        let detailedAttempt label targetNumber =
             let targetNumber = min 16 targetNumber
             let roll = d.roll()
-            if roll <= targetNumber then
+            match successTest targetNumber roll with
+            | CritSuccess _ as success ->
+                recordMsg $"{label} critically succeeded (needed {targetNumber}, rolled {roll})"
+                success
+            | Success _ as success ->
                 recordMsg $"{label} succeeded (needed {targetNumber}, rolled {roll})"
-                true
-            else
+                success
+            | Fail _ as fail ->
                 recordMsg $"{label} failed (needed {targetNumber}, rolled {roll})"
-                false
+                fail
+            | CritFail _ as fail ->
+                recordMsg $"{label} failed (needed {targetNumber}, rolled {roll})"
+                fail
+        let attempt label targetNumber =
+            match detailedAttempt label targetNumber with
+            | (CritSuccess _ | Success _) as success -> true
+            | (CritFail _ | Fail _) -> false
         let checkGoesUnconscious (self: Combatant) incomingDamage =
             let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
             attempt "Stay conscious" (self.stats.HT_ - penalty) |> not
@@ -206,12 +230,14 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                     if (not doneEarly) then
                         match self |> tryFindTarget cqrs.State with
                         | Some victim ->
-                            if attempt "Attack" (defaultArg self.stats.WeaponSkill 10) then
+                            match detailedAttempt "Attack" (defaultArg self.stats.WeaponSkill 10) with
+                            | (Success _ | CritSuccess _) as success ->
                                 let defenseTarget, defense = chooseDefense victim
                                 let defenseLabel =
                                     (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
                                     + (if defense.targetRetreated then " and retreat" else "")
-                                if attempt defenseLabel defenseTarget then
+                                let critSuccess = match success with CritSuccess _ -> true | _ -> false
+                                if (not critSuccess) && attempt defenseLabel defenseTarget then
                                     SuccessfulDefense({ attacker = self.Id; target = victim.Id }, defense, msg)
                                 else
                                     let dmg = self.stats.Damage_.roll()
@@ -235,7 +261,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                     elif injury > (victim.stats.HP_ + 1) / 2 && (attempt "Knockdown check" victim.stats.HT_ |> not) then
                                         newConditions <- [Stunned; Prone]
                                     Hit({ attacker = self.Id; target = victim.Id }, { defense = Parry; targetRetreated = false }, injury, newConditions, msg)
-                            else
+                            | (Fail _ | CritFail _) ->
                                 Miss({ attacker = self.Id; target = victim.Id }, msg)
                         | None ->
                             doneEarly <- true
