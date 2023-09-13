@@ -150,11 +150,10 @@ let chooseDefense (victim: Combatant) =
         | Parry (parry, retreat), Block (block, _) when parry >= block && parry >= dodge ->
             // I guess we'll use parry in this case because we have to pick something
             parry, { defense = Parry; targetRetreated = retreat }
-        | Parry (parry, retreat), _ when parry >= dodge ->
-            // I guess we'll use parry in this case because we have to pick something
-            parry, { defense = Parry; targetRetreated = retreat }
         | _, Block (block, retreat) when block >= dodge ->
             block, { defense = Block; targetRetreated = retreat }
+        | Parry (parry, retreat), _ when parry >= dodge ->
+            parry, { defense = Parry; targetRetreated = retreat }
         | _ ->
             dodge, { defense = Dodge; targetRetreated = retreat }
     let target =
