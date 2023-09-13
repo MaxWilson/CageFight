@@ -311,7 +311,7 @@ module App =
                 let priorRound _ =
                     match combatLog
                             |> List.mapi Tuple2.create
-                            |> List.tryFindIndex (function (ix, ((None | Some (NewRound _)), _)) when ix < currentIndex -> true | _ -> false)
+                            |> List.tryFindIndexBack (function (ix, ((None | Some (NewRound _)), _)) when ix < currentIndex -> true | _ -> false)
                             with
                     | Some ix -> setIndex ix ()
                     | None -> setIndex 0 () // should only happen when we're already at the front
