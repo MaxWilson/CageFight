@@ -211,7 +211,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                     SuccessfulDefense({ attacker = self.Id; target = victim.Id }, defense, msg)
                                 else
                                     let dmg = self.stats.Damage_.roll()
-                                    let penetratingDmg = dmg - victim.stats.DR_
+                                    let penetratingDmg = dmg - victim.stats.DR_ |> max 0
                                     let injury = match self.stats.DamageType with
                                                     | Some Cutting -> (float penetratingDmg * 1.5) |> int
                                                     | Some Impaling -> penetratingDmg * 2
