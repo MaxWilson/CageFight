@@ -286,8 +286,7 @@ module App =
                     ]
                 ]
             class' "logButtons" Html.div [
-                let changeIndex delta _ =
-                    let newIndex = currentIndex + delta
+                let setIndex newIndex _ =
                     if newIndex >= 0 && newIndex < combatLog.Length then
                         setCurrentIndex newIndex
                         setCombat (combatLog.[newIndex] |> snd)
@@ -296,10 +295,27 @@ module App =
                         let entry =
                             log.childNodes[newIndex]
                         entry |> scrollIntoView
-                Html.button [prop.text "<<"; prop.onClick (changeIndex -currentIndex)]
+                let changeIndex delta =
+                    let newIndex = currentIndex + delta
+                    setIndex newIndex
+                let priorRound _ =
+                    match combatLog
+                            |> List.mapi Tuple2.create
+                            |> List.tryFindIndex (function (ix, ((None | Some (NewRound _)), _)) when ix < currentIndex -> true | _ -> false)
+                            with
+                    | Some ix -> setIndex ix ()
+                    | None -> setIndex 0 () // should only happen when we're already at the front
+                let nextRound _ =
+                    match combatLog
+                            |> List.mapi Tuple2.create
+                            |> List.tryFindIndex (function (ix, ((None | Some (NewRound _)), _)) when ix > currentIndex -> true | _ -> false)
+                            with
+                    | Some ix -> setIndex ix ()
+                    | None -> setIndex (combatLog.Length - 1) ()
+                Html.button [prop.text "<<"; prop.onClick priorRound]
                 Html.button [prop.text "<"; prop.onClick (changeIndex -1)]
                 Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
-                Html.button [prop.text ">>"; prop.onClick (changeIndex (combatLog.Length - currentIndex - 1))]
+                Html.button [prop.text ">>"; prop.onClick nextRound]
                 Html.span [
                     Html.text "Show rolls"
                     Html.input [prop.type'.checkbox; prop.isChecked showRolls; prop.onCheckedChange setShowRolls]
