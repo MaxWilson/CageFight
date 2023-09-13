@@ -314,7 +314,8 @@ module App =
                             | v when v |> List.contains Dead -> hit "kills"
                             | v when v |> List.contains Unconscious -> hit "KOs"
                             | v when v |> List.contains Stunned -> hit "stuns"
-                            | _ -> hit "hits"
+                            | _ ->
+                                div [name ids.attacker; Html.text $" hits "; name ids.target; Html.text $" for {injury} HP"; viewDetails rollDetails]
                         | SuccessfulDefense(ids, { defense = Parry }, rollDetails) ->
                             div [name ids.attacker; Html.text " attacks "; name ids.target; Html.text " who parries"; viewDetails rollDetails]
                         | SuccessfulDefense(ids, { defense = Block }, rollDetails) ->

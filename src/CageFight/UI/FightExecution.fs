@@ -168,7 +168,6 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                         match self |> tryFindTarget cqrs.State with
                         | Some victim ->
                             if attempt "Attack" (defaultArg self.stats.WeaponSkill 10) then
-                                let defenseRoll = d.roll()
                                 let dodgeTarget, retreat = if victim.retreatUsed then int victim.stats.Dodge_, false else (3 + int victim.stats.Dodge_), true
                                 let defense = { defense = Dodge; targetRetreated = retreat }
                                 if attempt (if retreat then "Dodge and retreat" else "Dodge") dodgeTarget then
