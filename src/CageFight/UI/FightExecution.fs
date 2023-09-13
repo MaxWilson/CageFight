@@ -179,6 +179,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                                     | Some Cutting -> (float penetratingDmg * 1.5) |> int
                                                     | Some Impaling -> penetratingDmg * 2
                                                     | _ -> penetratingDmg
+                                    recordMsg $"Damage {self.stats.Damage_} ({dmg} {self.stats.DamageType}) - DR {victim.stats.DR_} = {injury} injury"
                                     let mutable newConditions = []
                                     let hp' = victim.CurrentHP_ - injury
                                     // -5 x max HP is auto-death
