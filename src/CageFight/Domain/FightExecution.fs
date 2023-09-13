@@ -9,21 +9,21 @@ type Combatant = {
     number: int
     team: int
     stats: Creature
-    damageTaken: int
+    injuryTaken: int
     statusMods: Status list
     retreatUsed: bool
     blockUsed: bool
     parriesUsed: int
     }
     with
-    member this.CurrentHP_ = this.stats.HP_ - this.damageTaken
+    member this.CurrentHP_ = this.stats.HP_ - this.injuryTaken
     member this.Id : CombatantId = this.team, this.personalName
     static member fresh (team, name, number, stats: Creature) =
         {   team = team
             personalName = name
             number = number
             stats = stats
-            damageTaken = 0
+            injuryTaken = 0
             statusMods = []
             retreatUsed = false
             blockUsed = false
@@ -76,7 +76,7 @@ module CombatEvents =
         let takeDamage (id: CombatantId) amount conditions =
             updateCombatant id (fun c ->
                 { c with
-                    damageTaken = c.damageTaken + amount
+                    injuryTaken = c.injuryTaken + amount
                     statusMods = List.distinct (c.statusMods @ conditions)
                     })
         match msg with
@@ -103,7 +103,7 @@ type FightResult =
     | CalibratedResult of lower:int option * upper:int option * sample:CombatLog
     | SpecificResult of CombatLog * {| victors: int list |}
 
-let tryFindTarget (combat: Combat) (attacker: Combatant) =
+let prioritizeTargets (combat: Combat) (attacker: Combatant) =
     let betweenInclusive (min, max) x = min <= x && x <= max
     let potentialTargets =
         combat.combatants.Values
@@ -118,15 +118,18 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
         // then targets at or below 0 HP
         // then anyone still alive (ordered by statblock name and number because why not, and it makes readouts more predictable)
         |> Seq.sortBy(fun c ->
-            (c.statusMods |> List.exists ((=) Stunned))
-                && c.CurrentHP_ > -c.stats.HP_,
-            (c.statusMods |> List.exists ((=) Prone))
-                && c.CurrentHP_ > -c.stats.HP_,
-            betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_,
-            c.CurrentHP_ <= 0,
+            ((c.statusMods |> List.contains Stunned)
+                && c.CurrentHP_ > -c.stats.HP_) |> not,
+            ((c.statusMods |> List.contains Prone)
+                && c.CurrentHP_ > -c.stats.HP_) |> not,
+            betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_ |> not,
+            c.CurrentHP_ <= 0 |> not,
             c.stats.name,
             c.number)
-    potentialTargets |> Seq.tryHead
+    potentialTargets
+
+let tryFindTarget (combat: Combat) (attacker: Combatant) =
+    prioritizeTargets combat attacker |> Seq.tryHead
 
 let chooseDefense (victim: Combatant) =
     let (|Parry|_|) = function
