@@ -128,15 +128,17 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
             c.number)
     potentialTargets |> Seq.tryHead
 
-let chooseDefense victim =
+let chooseDefense (victim: Combatant) =
     let (|Parry|_|) = function
         | Some parry ->
-            let parry = (parry - victim.parriesUsed / victim.stats.ExtraParry_)
-            Some(if victim.retreatUsed then parry, false else 3 + parry, true)
+            printfn $"{victim.personalName} has a parry of {parry}"
+            let parry = (parry - victim.parriesUsed / (1 + victim.stats.ExtraParry_))
+            printfn $"{victim.personalName} has a modified parry of {parry}"
+            Some(if victim.retreatUsed then parry, false else 1 + parry, true)
         | None -> None
     let (|Block|_|) = function
         | Some block when victim.blockUsed = false ->
-            Some(if victim.retreatUsed then block, false else 3 + block, true)
+            Some(if victim.retreatUsed then block, false else 1 + block, true)
         | _ -> None
     let dodge, retreat =
         let dodge = if (float victim.CurrentHP_) >= (float victim.stats.HP_ / 3.)
@@ -148,6 +150,9 @@ let chooseDefense victim =
         | Parry (parry, retreat), Block (block, _) when parry >= block && parry >= dodge ->
             // I guess we'll use parry in this case because we have to pick something
             parry, { defense = Parry; targetRetreated = retreat }
+        | Parry (parry, retreat), _ when parry >= dodge ->
+            // I guess we'll use parry in this case because we have to pick something
+            parry, { defense = Parry; targetRetreated = retreat }
         | _, Block (block, retreat) when block >= dodge ->
             block, { defense = Block; targetRetreated = retreat }
         | _ ->
@@ -156,6 +161,7 @@ let chooseDefense victim =
         target
         + (if victim.statusMods |> List.contains Stunned then -4 else 0)
         + (if victim.statusMods |> List.contains Prone then -3 else 0)
+    printfn "Choosing defense for %s: %A" victim.personalName defense
     target, defense
 
 let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
@@ -169,7 +175,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
         let attempt label targetNumber =
             let roll = d.roll()
             if roll <= targetNumber then
-                recordMsg $"{label} succeeded (needed {targetNumber}, rolled {roll}) "
+                recordMsg $"{label} succeeded (needed {targetNumber}, rolled {roll})"
                 true
             else
                 recordMsg $"{label} failed (needed {targetNumber}, rolled {roll})"

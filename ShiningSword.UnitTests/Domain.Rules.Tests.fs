@@ -36,6 +36,7 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         verify <@ chooseDefenseUnderConditions 10 10 10 false 7 [Stunned] = (1, { defense = Dodge; targetRetreated = false })  @>
         verify <@ chooseDefenseUnderConditions 10 10 10 false 0 [Prone] = (10, { defense = Dodge; targetRetreated = false })  @>
         verify <@ chooseDefenseUnderConditions 10 10 10 false 0 [Stunned;Prone] = (3, { defense = Dodge; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithExtraParry 10 13 10 false 5 0 = (14, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 10 13 10 true 5 0 = (13, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 10 13 10 true 5 1 = (13, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 10 13 10 true 5 5 = (13, { defense = Parry; targetRetreated = false })  @>
