@@ -66,8 +66,18 @@ module App =
         | Fight v -> { model with execution = v }, Cmd.Empty
 
     let init () =
+        let dev = true
+        let updateWithDefaults catalog =
+            if dev then
+                // during development, we want to be able to overwrite user defaults so they get e.g. Berserk minotaurs when we add a Berserk field
+                let mutable output = catalog
+                let defaults = Domain.Defaults.database()
+                for k in defaults.Keys do
+                    output <- output |> Map.add k defaults[k]
+                output
+            else catalog
         let db =
-            { MonsterDatabase.fresh with catalog = LocalStorage.Catalog.read() }
+            { MonsterDatabase.fresh with catalog = LocalStorage.Catalog.read() |> updateWithDefaults }
         let fight = {
             sideA = [3, "Peshkali"; 1, "Slugbeast"]
             sideB = Calibrate(Some "Orc", None, None)
