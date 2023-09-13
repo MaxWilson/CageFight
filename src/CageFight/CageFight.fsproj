@@ -11,6 +11,7 @@
         <Compile Include="Core\DerivedTraits.fs" />
         <Compile Include="Domain\Random.fs" />
         <Compile Include="Domain\Domain.fs" />
+        <Compile Include="Domain\FightExecution.fs" />
         <None Include="sass\main.sass" />
         <None Include="index.html" />
         <Compile Include="UI\CommonUI.fs" />
@@ -18,7 +19,6 @@
         <Compile Include="UI\LocalStorage.fs" />
         <Compile Include="UI\DragDrop.fs" />
         <Compile Include="UI\Konva.fs" />
-        <Compile Include="UI\FightExecution.fs" />
         <Compile Include="UI\App.fs" />
     </ItemGroup>
     <ItemGroup>

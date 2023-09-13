@@ -10,7 +10,7 @@ open Domain.Random.Parser
 // make sure errors are not silent: show them as Alerts (ugly but better than nothing for now)
 open Fable.Core.JsInterop
 open Fable.Core
-open UI.FightExecution
+open Domain.FightExecution
 importSideEffects "../sass/main.sass"
 
 [<Emit("$0.scrollIntoView({block: 'nearest', inline: 'nearest'})")>]

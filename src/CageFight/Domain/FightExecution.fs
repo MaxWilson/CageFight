@@ -1,4 +1,4 @@
-module UI.FightExecution
+module Domain.FightExecution
 open Domain
 open Domain.Random
 
@@ -128,6 +128,36 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
             c.number)
     potentialTargets |> Seq.tryHead
 
+let chooseDefense victim =
+    let (|Parry|_|) = function
+        | Some parry ->
+            let parry = (parry - victim.parriesUsed / victim.stats.ExtraParry_)
+            Some(if victim.retreatUsed then parry, false else 3 + parry, true)
+        | None -> None
+    let (|Block|_|) = function
+        | Some block when victim.blockUsed = false ->
+            Some(if victim.retreatUsed then block, false else 3 + block, true)
+        | _ -> None
+    let dodge, retreat =
+        let dodge = if (float victim.CurrentHP_) >= (float victim.stats.HP_ / 3.)
+                    then victim.stats.Dodge_
+                    else victim.stats.Dodge_ / 2
+        if victim.retreatUsed then dodge, false else 3 + dodge, true
+    let target, defense =
+        match victim.stats.Parry, victim.stats.Block with
+        | Parry (parry, retreat), Block (block, _) when parry >= block && parry >= dodge ->
+            // I guess we'll use parry in this case because we have to pick something
+            parry, { defense = Parry; targetRetreated = retreat }
+        | _, Block (block, retreat) when block >= dodge ->
+            block, { defense = Block; targetRetreated = retreat }
+        | _ ->
+            dodge, { defense = Dodge; targetRetreated = retreat }
+    let target =
+        target
+        + (if victim.statusMods |> List.contains Stunned then -4 else 0)
+        + (if victim.statusMods |> List.contains Prone then -3 else 0)
+    target, defense
+
 let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
     // HIGH speed and DX goes first so we use the negative of those values
     for c in cqrs.State.combatants.Values |> Seq.sortBy (fun c -> -c.stats.Speed_, -c.stats.DX_, c.stats.name, c.number) |> Seq.map (fun c -> c.Id) do
@@ -168,14 +198,11 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                         match self |> tryFindTarget cqrs.State with
                         | Some victim ->
                             if attempt "Attack" (defaultArg self.stats.WeaponSkill 10) then
-                                let dodgeTarget, retreat =
-                                    if victim.retreatUsed then int victim.stats.Dodge_, false else (3 + int victim.stats.Dodge_), true
-                                let dodgeTarget =
-                                    dodgeTarget
-                                    + (if victim.statusMods |> List.contains Stunned then -4 else 0)
-                                    + (if victim.statusMods |> List.contains Prone then -3 else 0)
-                                let defense = { defense = Dodge; targetRetreated = retreat }
-                                if attempt (if retreat then "Dodge and retreat" else "Dodge") dodgeTarget then
+                                let defenseTarget, defense = chooseDefense victim
+                                let defenseLabel =
+                                    (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
+                                    + (if defense.targetRetreated then " and retreat" else "")
+                                if attempt defenseLabel defenseTarget then
                                     SuccessfulDefense({ attacker = self.Id; target = victim.Id }, defense, msg)
                                 else
                                     let dmg = self.stats.Damage_.roll()
