@@ -196,7 +196,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                     // check for unconsciousness on dropping to zero HP
                                     elif self.CurrentHP_ > 0 && hp' <= 0 && checkGoesUnconscious victim injury then
                                         newConditions <- [Unconscious]
-                                    elif injury > (victim.stats.HP_ + 1) / 2 && attempt "Knockdown check" victim.stats.HT_ then
+                                    elif injury > (victim.stats.HP_ + 1) / 2 && (attempt "Knockdown check" victim.stats.HT_ |> not) then
                                         newConditions <- [Stunned; Prone]
                                     Hit({ attacker = self.Id; target = victim.Id }, { defense = Parry; targetRetreated = false }, injury, newConditions, msg)
                             else
