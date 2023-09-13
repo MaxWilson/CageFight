@@ -57,13 +57,15 @@ body
             max-width: 3em
             margin-left: 3px
             margin-right: 3px
+        button
+            margin-left: 3px
     .combat
         display: grid
         grid-template-columns: auto 1fr
         grid-template-areas: "statusTable logButtons" "statusTable logEntries"
         .statusTable
             grid-area: statusTable
-            max-height: 60vh
+            max-height: 55vh
             overflow-y: auto
             table
                 min-width: 25vw
@@ -79,7 +81,7 @@ body
                 left: 5px
         .logEntries
             grid-area: logEntries
-            max-height: calc(60vh - 30px)
+            max-height: calc(55vh - 30px)
             overflow-y: auto
             .details
                 margin-left: 8px

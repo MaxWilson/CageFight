@@ -99,6 +99,10 @@ module CombatEvents =
                 { c with statusMods = c.statusMods |> List.filter ((<>) Prone) })
         | Info _ | NewRound _ -> model
 type CombatLog = (Event option * Combat) list
+type DefeatCriteria =
+    | TPK
+    | OneCasualty
+    | HalfCasualties
 type FightResult =
     | CalibratedResult of lower:int option * upper:int option * sample:CombatLog
     | SpecificResult of CombatLog * {| victors: int list |}
@@ -300,7 +304,7 @@ let specificFight db team1 team2 =
     let cqrs = CQRS.CQRS.Create((createCombat db team1 team2), update)
     let victors = fight cqrs
     cqrs.LogWithMessages(), victors
-let calibrate db team1 (enemyType, minbound, maxbound) =
+let calibrate db team1 (enemyType, minbound, maxbound, defeatCriteria) =
     let runForN n =
         let combat = createCombat db team1 [ n, enemyType ]
         let cqrs = CQRS.CQRS.Create(combat, update)
@@ -314,7 +318,27 @@ let calibrate db team1 (enemyType, minbound, maxbound) =
                     runForN n
                 ]
             let sampleLog: CombatLog = (runs |> List.last |> fst).LogWithMessages()
-            let victories = runs |> List.sumBy (function (_, v) when v.victors = [1] -> 1 | _ -> 0)
+            let victoryMetric : CQRS.CQRS<_, Combat> * {| victors: int list |} -> int =
+                match defeatCriteria with
+                | TPK -> function (_, v) when v.victors = [1] -> 1 | otherwise -> 0
+                | OneCasualty ->
+                    fun (cqrs, v) ->
+                        // in this case, TeamA is very casualty-averse. Defeat is taking even one casualty (dead or unconscious).
+                        if cqrs.State.combatants.Values |> Seq.exists (fun c ->
+                            c.team = 1 && c.statusMods |> List.exists (
+                                function Dead | Unconscious -> true | _ -> false)) then
+                            0
+                        else 1
+                | HalfCasualties ->
+                    fun (cqrs, v) ->
+                        // in this case, TeamA is somewhat casualty-averse. Defeat is a pyrrhic victory where at least half the team dies.
+                        let friendlies = cqrs.State.combatants.Values |> Seq.filter (fun c -> c.team = 1)
+                        let deadFriendlies = friendlies |> Seq.filter (fun c -> c.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false))
+                        if deadFriendlies |> Seq.length >= ((friendlies |> Seq.length) / 2) then
+                            0
+                        else 1
+
+            let victories = runs |> List.sumBy victoryMetric
             results <- results |> Map.add n (victories, sampleLog)
             results[n]
     // crude and naive model: search from 1 to 100, but quit early when we fall to 0% victory
@@ -334,5 +358,5 @@ let calibrate db team1 (enemyType, minbound, maxbound) =
     | inbounds ->
         let min = inbounds |> List.min
         let max = inbounds |> List.max
-        let sampleFight: CombatLog = get min |> snd
+        let sampleFight: CombatLog = get max |> snd
         Some min, Some max, Some sampleFight

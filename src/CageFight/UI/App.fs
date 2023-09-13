@@ -21,7 +21,7 @@ module App =
         | Home
         | Editing of name:string
     type Opposition =
-        | Calibrate of string option * int option * int option
+        | Calibrate of string option * int option * int option * DefeatCriteria
         | Specific of (int * string) list
     type FightSetup = {
         sideA: (int * string) list
@@ -55,7 +55,7 @@ module App =
         | Clear side ->
             let clearSide = function
                 | SideA -> { model.fightSetup with sideA = [] }
-                | SideB -> { model.fightSetup with sideB = Calibrate(None, None, None) }
+                | SideB -> { model.fightSetup with sideB = Calibrate(None, None, None, TPK) }
             { model with fightSetup = clearSide side }, Cmd.Empty
         | Upsert creature ->
             if creature.name |> String.isntWhitespace then
@@ -80,7 +80,7 @@ module App =
             { MonsterDatabase.fresh with catalog = LocalStorage.Catalog.read() |> updateWithDefaults }
         let fight = {
             sideA = [3, "Peshkali"; 1, "Slugbeast"]
-            sideB = Calibrate(Some "Orc", None, None)
+            sideB = Calibrate(Some "Orc", None, None, TPK)
             }
         { error = None; page = Home; fightSetup = fight; database = db; execution = NotStarted }, Cmd.Empty
 
@@ -96,15 +96,15 @@ module App =
                 | _ when (model.fightSetup.sideA |> List.sumBy fst) = 0 ->
                     Fight NotStarted |> dispatch
                     dispatch (Error "You have to pick monsters first")
-                | Calibrate(None, _, _) ->
+                | Calibrate(None, _, _, _) ->
                     Fight NotStarted |> dispatch
                     dispatch (Error "You have to pick monsters first")
-                | Calibrate(Some name, min, max) ->
+                | Calibrate(Some name, min, max, defeatCriteria) ->
                     let min = (defaultArg min 50 |> float) / 100.
                     let max = (defaultArg max 90 |> float) / 100.
                     match calibrate model.database.catalog
                             model.fightSetup.sideA
-                            (name, min, max) with
+                            (name, min, max, defeatCriteria) with
                     | minQuantity, maxQuantity, Some sampleMaxFight ->
                         Completed(model.fightSetup, CalibratedResult(minQuantity, maxQuantity, sampleMaxFight)) |> Fight |> dispatch
                     | v ->
@@ -463,9 +463,9 @@ module App =
                                         with
                                         sideB =
                                             match fight.sideB with
-                                            | Specific ((quantity, name)::_) -> Calibrate(Some name, None, None)
-                                            | Specific _ -> Calibrate(None, None, None)
-                                            | Calibrate(Some name, _, _) -> Specific [1, name]
+                                            | Specific ((quantity, name)::_) -> Calibrate(Some name, None, None, TPK)
+                                            | Specific _ -> Calibrate(None, None, None, TPK)
+                                            | Calibrate(Some name, _, _, _) -> Specific [1, name]
                                             | _ -> Specific []
                                         }
                                 match model.fightSetup.sideB with
@@ -499,37 +499,56 @@ module App =
                                                     editLink (Some quantity) name
                                                     ]
                                         ]
-                                | Calibrate(name, min, max) ->
+                                | Calibrate(name, min, max, defeatCriteria) ->
                                     let setSideB name fightSetup =
-                                        { fightSetup with sideB = Calibrate(Some name, min, max)
+                                        { fightSetup with sideB = Calibrate(Some name, min, max, defeatCriteria)
                                             }
                                     monsterPicker (model.database, name.IsNone) ("Set", setSideB >> ChangeFight >> dispatch, SideB, dispatch) <| React.fragment [
                                         Html.button [prop.text "Find optimal quantity"; onClick changeMode]
                                             |> wrapInDiv
                                         match name with
                                         | Some name ->
-                                            Html.div [
-                                                editLink None name
-                                                Html.text "should lose"
-                                                class' "calibrationRange" Html.span [
-                                                    let changeMin (txt: string) =
-                                                        let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
-                                                        ChangeFight (fun fight -> { fight with sideB = Calibrate(Some name, v, max) }) |> dispatch
-                                                    let changeMax (txt: string) =
-                                                        let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
-                                                        ChangeFight (fun fight -> { fight with sideB = Calibrate(Some name, min, v) }) |> dispatch
-                                                    Html.input [
-                                                        prop.type'.number; prop.placeholder (defaultArg min 50 |> toString)
-                                                        prop.onChange changeMin; prop.max 99
-                                                        match min with Some min -> prop.valueOrDefault min | None -> ()
+                                            class' "calibrationRange" Html.div [
+                                                Html.div [
+                                                    editLink None name
+                                                    Html.text "should lose"
+                                                    class' "calibrationRange" Html.span [
+                                                        let changeMin (txt: string) =
+                                                            let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
+                                                            ChangeFight (fun fight -> { fight with sideB = Calibrate(Some name, v, max, defeatCriteria) }) |> dispatch
+                                                        let changeMax (txt: string) =
+                                                            let v = match System.Int32.TryParse txt with true, v -> Some v | _ -> None
+                                                            ChangeFight (fun fight -> { fight with sideB = Calibrate(Some name, min, v, defeatCriteria) }) |> dispatch
+                                                        Html.input [
+                                                            prop.type'.number; prop.placeholder (defaultArg min 50 |> toString)
+                                                            prop.onChange changeMin; prop.max 99
+                                                            match min with Some min -> prop.valueOrDefault min | None -> ()
+                                                            ]
+                                                        Html.text "% to "
+                                                        Html.input [
+                                                            prop.type'.number; prop.placeholder (defaultArg max 90 |> toString)
+                                                            prop.onChange changeMax; prop.max 99
+                                                            match max with Some max -> prop.valueOrDefault max | None -> ()
+                                                            ]
+                                                        Html.text "% of the time"
                                                         ]
-                                                    Html.text "% to "
-                                                    Html.input [
-                                                        prop.type'.number; prop.placeholder (defaultArg max 90 |> toString)
-                                                        prop.onChange changeMax; prop.max 99
-                                                        match max with Some max -> prop.valueOrDefault max | None -> ()
-                                                        ]
-                                                    Html.text "% of the time"
+                                                    ]
+                                                Html.div [
+                                                    Html.text "as measured by"
+                                                    let defeatDescription =
+                                                        match defeatCriteria with
+                                                        | TPK -> "Not killing every enemy"
+                                                        | OneCasualty -> "Not killing at least one enemy"
+                                                        | HalfCasualties -> "Not killing at least half the enemies"
+                                                    let toggleDefeatCriteria _ =
+                                                        let defeatCriteria =
+                                                            match defeatCriteria with
+                                                            | TPK -> OneCasualty
+                                                            | OneCasualty -> HalfCasualties
+                                                            | HalfCasualties -> TPK
+                                                        ChangeFight (fun fight -> { fight with sideB = Calibrate(Some name, min, max, defeatCriteria) }) |> dispatch
+
+                                                    Html.button [prop.text $"{defeatDescription}"; prop.onClick toggleDefeatCriteria]
                                                     ]
                                                 ]
                                         | None -> Html.div "No creatures selected"
@@ -561,7 +580,7 @@ module App =
                                     Html.div $"Stalemate!"
                                 viewCombat (setup, combat) dispatch
                             | CalibratedResult(minQuantity, maxQuantity, sampleCombat) ->
-                                let name, min, max = match setup.sideB with Calibrate(Some name, min, max) -> name, min, max | _ -> shouldntHappen()
+                                let name, min, max = match setup.sideB with Calibrate(Some name, min, max, _) -> name, min, max | _ -> shouldntHappen()
                                 let min = defaultArg min 50
                                 let max = defaultArg max 90
                                 class' "statistics" Html.div [
