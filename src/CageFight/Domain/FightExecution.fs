@@ -175,6 +175,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
         let recordMsg txt =
             if msg = "" then msg <- txt else msg <- $"{msg}; {txt}"
         let attempt label targetNumber =
+            let targetNumber = min 16 targetNumber
             let roll = d.roll()
             if roll <= targetNumber then
                 recordMsg $"{label} succeeded (needed {targetNumber}, rolled {roll})"
