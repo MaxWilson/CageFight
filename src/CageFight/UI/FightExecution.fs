@@ -150,14 +150,14 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
         let mutable doneEarly = false
         let self = cqrs.State.combatants[c]
         if self.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
-            if self.CurrentHP_ <= 0 && checkGoesUnconscious self 0 then
-                FallUnconscious(self.Id, msg)
-                |> cqrs.Execute
-            elif self.statusMods |> List.exists ((=) Stunned) then
+            if self.statusMods |> List.exists ((=) Stunned) then
                 if attempt "Recover from stun" self.stats.HT_ then
                     Unstun(self.Id, msg)
                 else
                     Info(self.Id, "does nothing", msg)
+                |> cqrs.Execute
+            elif self.CurrentHP_ <= 0 && checkGoesUnconscious self 0 then
+                FallUnconscious(self.Id, msg)
                 |> cqrs.Execute
             elif self.statusMods |> List.exists ((=) Prone) then
                 StandUp(self.Id, msg)
