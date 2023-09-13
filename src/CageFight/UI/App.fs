@@ -13,6 +13,9 @@ open Fable.Core
 open UI.FightExecution
 importSideEffects "../sass/main.sass"
 
+[<Emit("$0.scrollIntoView({block: 'nearest', inline: 'nearest'})")>]
+let scrollIntoView (element: Browser.Types.Node) = jsNative
+
 module App =
     type Page =
         | Home
@@ -284,8 +287,15 @@ module App =
                     if newIndex >= 0 && newIndex < combatLog.Length then
                         setCurrentIndex newIndex
                         setCombat (combatLog.[newIndex] |> snd)
+                        // set focus to the newly-selected row
+                        let log = (Browser.Dom.document.getElementsByClassName "logEntries")[0]
+                        let entry =
+                            log.childNodes[newIndex]
+                        entry |> scrollIntoView
+                Html.button [prop.text "<<"; prop.onClick (changeIndex -currentIndex)]
                 Html.button [prop.text "<"; prop.onClick (changeIndex -1)]
                 Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
+                Html.button [prop.text ">>"; prop.onClick (changeIndex (combatLog.Length - currentIndex - 1))]
                 Html.span [
                     Html.text "Show rolls"
                     Html.input [prop.type'.checkbox; prop.isChecked showRolls; prop.onCheckedChange setShowRolls]
