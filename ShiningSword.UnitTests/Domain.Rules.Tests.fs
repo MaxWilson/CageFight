@@ -38,11 +38,11 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         verify <@ chooseDefenseUnderConditions 10 0 0 true 7 [Stunned] = (1, { defense = Dodge; targetRetreated = false })  @>
         verify <@ chooseDefenseUnderConditions 10 0 0 false 0 [Prone] = (10, { defense = Dodge; targetRetreated = true })  @>
         verify <@ chooseDefenseUnderConditions 10 0 0 true 0 [Stunned;Prone] = (3, { defense = Dodge; targetRetreated = false })  @>
-        verify <@ chooseDefenseWithExtraParry 10 13 10 false 5 0 = (14, { defense = Parry; targetRetreated = true })  @>
-        verify <@ chooseDefenseWithExtraParry 10 13 10 true 5 0 = (13, { defense = Parry; targetRetreated = false })  @>
-        verify <@ chooseDefenseWithExtraParry 10 13 10 true 5 1 = (13, { defense = Parry; targetRetreated = false })  @>
-        verify <@ chooseDefenseWithExtraParry 10 13 10 true 5 5 = (13, { defense = Parry; targetRetreated = false })  @>
-        verify <@ chooseDefenseWithExtraParry 10 13 10 true 5 6 = (10, { defense = Dodge; targetRetreated = false })  @>
-        verify <@ chooseDefenseWithExtraParry 10 13 10 true 5 7 = (10, { defense = Dodge; targetRetreated = false })  @>
-        verify <@ chooseDefenseWithExtraParry 0 13 0 true 5 7 = (9, { defense = Dodge; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithExtraParry 10 13 0 false 5 0 = (14, { defense = Parry; targetRetreated = true })  @>
+        verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 0 = (13, { defense = Parry; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 1 = (13, { defense = Parry; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 5 = (13, { defense = Parry; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 6 = (10, { defense = Dodge; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 7 = (10, { defense = Dodge; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithExtraParry 0 13 0 true 5 7 = (9, { defense = Parry; targetRetreated = false })  @>
     ]

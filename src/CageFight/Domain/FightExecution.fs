@@ -132,7 +132,7 @@ let chooseDefense (victim: Combatant) =
     let (|Parry|_|) = function
         | Some parry ->
             printfn $"{victim.personalName} has a parry of {parry}"
-            let parry = (parry - victim.parriesUsed / (1 + victim.stats.ExtraParry_))
+            let parry = (parry - (if victim.stats.WeaponMaster then 2 else 4) * (victim.parriesUsed / (1 + victim.stats.ExtraParry_)))
             printfn $"{victim.personalName} has a modified parry of {parry}"
             Some(if victim.retreatUsed then parry, false else 1 + parry, true)
         | None -> None
