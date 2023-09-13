@@ -318,7 +318,7 @@ module App =
                 let nextRound _ =
                     match combatLog
                             |> List.mapi Tuple2.create
-                            |> List.tryFindIndex (function (ix, ((None | Some (NewRound _)), _)) when ix > currentIndex -> true | _ -> false)
+                            |> List.tryFindIndex (function (ix, (Some (NewRound _), _)) when (currentIndex = 0 || ix > currentIndex) -> true | _ -> false)
                             with
                     | Some ix -> setIndex ix ()
                     | None -> setIndex (combatLog.Length - 1) ()
