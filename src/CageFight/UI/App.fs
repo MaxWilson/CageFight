@@ -491,7 +491,8 @@ module App =
                                         let changeSideB = function
                                             | Specific lst ->
                                                 lst
-                                                |> List.map (function (quantity, name') when name = name' -> (quantity + delta |> max 1, name) | otherwise -> otherwise)
+                                                |> List.map (function (quantity, name') when name = name' -> (quantity + delta, name) | otherwise -> otherwise)
+                                                |> List.filter (fun (quantity, name') -> quantity > 0)
                                                 |> Specific
                                             | otherwise -> otherwise
                                         { f with sideB = f.sideB |> changeSideB }
