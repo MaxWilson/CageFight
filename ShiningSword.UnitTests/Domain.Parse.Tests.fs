@@ -13,7 +13,7 @@ let makeVerify() =
     let mutable counter = 0
     let addCounter label =
         counter <- counter + 1
-        sprintf "%d) %s" counter label
+        sprintf "%2d) %s" counter label
     let verify = fun label condition -> testCase (addCounter label) <| fun _ -> Swensen.Unquote.Assertions.test condition
     let pverify = fun label condition -> ptestCase (addCounter label) <| fun _ -> Swensen.Unquote.Assertions.test condition
     verify, pverify
@@ -55,10 +55,10 @@ let AcceptanceTests() = testLabel "Acceptance tests" <| testList "Parsing" [
     testList "Peshkali" [
         let verify, pverify = makeVerify()
         let creature = lazy(
-            parse (|Creature|_|) "Peshkali [Peshkalir]: ST 20 DX 12 IQ 14 HT 15 DR 4 HP 22 Speed 6 Weapon Master Skill 22 sw+1 cut Dodge 10 Parry 13 Extra Attack 5 Extra Parry 5"
+            parse (|Creature|_|) "Peshkali [Peshkalir]: ST 20 DX 12 IQ 14 HT 15 DR 4 HP 22 Supernatural Durability Speed 6 Weapon Master Skill 22 sw+1 cut Dodge 10 Parry 13 Extra Attack 5 Extra Parry 5"
             )
         verify "Name" <@ creature.Value.name = "Peshkali" @>
-        verify "Name" <@ creature.Value.PluralName_ = "Peshkalir" @>
+        verify "Plural Name" <@ creature.Value.PluralName_ = "Peshkalir" @>
         verify "ST" <@ creature.Value.ST_ = 20 @>
         verify "DX" <@ creature.Value.DX_ = 12 @>
         verify "IQ" <@ creature.Value.IQ_ = 14 @>
@@ -75,6 +75,7 @@ let AcceptanceTests() = testLabel "Acceptance tests" <| testList "Parsing" [
         verify "Block" <@ creature.Value.Block = None @>
         verify "ExtraAttack" <@ creature.Value.ExtraAttack_ = 5 @>
         verify "ExtraParry" <@ creature.Value.ExtraParry_ = 5 @>
+        verify "SupernaturalDurability" <@ creature.Value.SupernaturalDurability = true @>
         ]
     testList "Tiger" [
         let verify, pverify = makeVerify()
@@ -85,5 +86,16 @@ let AcceptanceTests() = testLabel "Acceptance tests" <| testList "Parsing" [
         verify "ST" <@ creature.Value.ST.Value = 13 @>
         verify "DX" <@ creature.Value.DX.Value = 15 @>
         verify "Skill, computed damage" <@ creature.Value.WeaponSkill = Some 16 && creature.Value.Damage_ = RollSpec.create(2,6,-1) && creature.Value.DamageType = Some Impaling  @>
+        ]
+    testList "Rock Mite" [
+        let verify, pverify = makeVerify()
+        let creature = lazy(
+            parse (|Creature|_|)  "Unnatural Rock Mite: ST 12 HT 13 DR 5 Homogenous Skill 10 1d-1 cut + followup 2d burn Unnatural"
+            )
+        verify "Homogenous" <@ creature.Value.InjuryTolerance = Some Homogenous @>
+        verify "UnnaturallyFragile" <@ creature.Value.UnnaturallyFragile = true @>
+        verify "DR" <@ creature.Value.DR_ = 5 @>
+        verify "Bite damage" <@ creature.Value.Damage_ = RollSpec.create(1,6,-1) && creature.Value.DamageType = Some Cutting @>
+        verify "Lava damage" <@ creature.Value.FollowupDamage = Some (RollSpec.create(2,6)) && creature.Value.FollowupDamageType = Some Burning @>
         ]
     ]

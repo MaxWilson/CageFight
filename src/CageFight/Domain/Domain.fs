@@ -5,7 +5,7 @@ module Core =
     open Domain.Random
 
     type 't prop = 't option
-    type DamageType = Cutting | Impaling | Crushing | Piercing | Other
+    type DamageType = Cutting | Impaling | Crushing | Piercing | Burning | Other
     type DamageSpec = Explicit of RollSpec | Swing of int | Thrust of int
     let swingDamage st bonusOrPenalty =
         if st < 9 then RollSpec.create(1,6, bonusOrPenalty + (st-12)/2)
@@ -23,6 +23,7 @@ module Core =
             RollSpec.create(nDice, 6, bonusOrPenalty + bonus)
         else
             notImpl "Thrust damage for ST 28+"
+    type InjuryTolerance = Unliving | Homogenous | Diffuse
     type Creature = {
         name: string
         pluralName: string prop
@@ -42,6 +43,11 @@ module Core =
         WeaponSkill: int prop
         Damage: DamageSpec prop
         DamageType: DamageType prop
+        FollowupDamage: RollSpec prop
+        FollowupDamageType: DamageType prop
+        UnnaturallyFragile: bool
+        SupernaturalDurability: bool
+        InjuryTolerance: InjuryTolerance option
         }
         with
         static member create (name: string, ?pluralName) =
@@ -57,12 +63,17 @@ module Core =
               WeaponSkill = None
               Damage = None
               DamageType = None
+              FollowupDamage = None
+              FollowupDamageType = None
               DR = None
               Dodge = None
               Parry = None
               Block = None
               ExtraAttack = None
               ExtraParry = None
+              UnnaturallyFragile = false
+              SupernaturalDurability = false
+              InjuryTolerance = None
               }
         // "_" means "defaulted" in the sense that it's the value that will be used if the property is not set.
         member this.PluralName_ = defaultArg this.pluralName (this.name + "s")
@@ -111,6 +122,8 @@ module Parser =
         | OWSStr "piercing" rest
         | OWSStr "pierce" rest
         | OWSStr "pi" rest -> Some(DamageType.Piercing, rest)
+        | OWSStr "burning" rest
+        | OWSStr "burn" rest -> Some(DamageType.Burning, rest)
         | _ -> None
     let (|OptionalDamageType|_|) = pack <| function
         | DamageType(dt, rest) -> Some(Some dt, rest)
@@ -140,9 +153,16 @@ module Parser =
         | OWSStr "Block" (Int (v, rest)) -> Some((fun c -> { c with Block = Some v }), rest)
         | OWSStr "Weapon Master" rest -> Some((fun c -> { c with WeaponMaster = true }), rest)
         | OWSStr "Skill" (Int (v, rest)) -> Some((fun c -> { c with WeaponSkill = Some v }), rest)
+        | DamageOverall((damage, damageType), OWSStr "+" (OWSStr "followup" (OWS (Roll((followupDamage, OptionalDamageType(followupDamageType, rest)))))))
+            -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType; FollowupDamage = Some followupDamage; FollowupDamageType = followupDamageType }), rest)
         | DamageOverall((damage, damageType), rest) -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType }), rest)
         | OWSStr "Extra Attack" (Int (v, rest)) -> Some((fun c -> { c with ExtraAttack = Some v }), rest)
         | OWSStr "Extra Parry" (Int (v, rest)) -> Some((fun c -> { c with ExtraParry = Some v }), rest)
+        | OWSStr "Unliving" rest -> Some((fun c -> { c with InjuryTolerance = Some Unliving }), rest)
+        | OWSStr "Homogenous" rest -> Some((fun c -> { c with InjuryTolerance = Some Homogenous }), rest)
+        | OWSStr "Diffuse" rest -> Some((fun c -> { c with InjuryTolerance = Some Diffuse }), rest)
+        | OWSStr "Supernatural Durability" rest -> Some((fun c -> { c with SupernaturalDurability = true }), rest)
+        | OWSStr "Unnatural" rest -> Some((fun c -> { c with UnnaturallyFragile = true }), rest)
         | _ -> None
     let rec (|CreatureProperties|_|) = pack <| function
         | CreatureProperties(fprops, CreatureProperty(fprop, rest)) -> Some(fprops >> fprop, rest)
@@ -164,11 +184,13 @@ module Defaults =
     let database() =
         [
             let parse (input: string) = match ParseArgs.Init input with | Parser.Creature(c, End) -> c | _ -> shouldntHappen input
-            parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 DR 4 Skill 18 sw+1 cut Extra Attack 5 Extra Parry 5 Parry 13 Dodge 10"
+            parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 DR 4 Skill 18 sw+1 cut Extra Attack 5 Extra Parry 5 Parry 13 Dodge 10 Supernatural Durability"
             parse "Orc: ST 12 DX 11 IQ 9 HT 11 DR 2 HP 14 Dodge 7 Parry 9 Block 9 Skill 13 sw+1 cut"
             parse "Ogre: ST 20 DX 11 IQ 7 HT 13 Skill 16 3d+7 cr Parry 11 DR 3"
             parse "Slugbeast: ST 16 IQ 2 Skill 12 1d+2"
-            parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp DR 2 Speed 8 Parry 10 Block 10"
+            parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp DR 2 Speed 8 Parry 10 Block 10 Unliving Unnatural"
+            parse "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
+            parse "Rock Mite: ST 12 HT 13 DR 5 Homogenous Skill 10 1d-1 cut + followup 2d burn"
             ]
         |> List.map(fun c -> c.name, c)
         |> Map.ofList
