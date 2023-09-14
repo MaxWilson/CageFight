@@ -270,10 +270,10 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                         | Some r when penetratingDmg > 0 ->
                                             let followup, followupType = (r.roll(), self.stats.FollowupDamageType)
                                             let injury = injury + toInjury (followup, followupType)
-                                            recordMsg $"Damage {self.stats.Damage_} + {r} ({dmg} {self.stats.DamageType}, {followup} {followupType}) - DR {victim.stats.DR_} = {injury} injury"
+                                            recordMsg $"Damage {self.stats.Damage_} + {r} ({dmg} {defaultArg self.stats.DamageType Other}, {followup} {followupType}) - DR {victim.stats.DR_} = {injury} injury"
                                             injury
                                         | _ ->
-                                            recordMsg $"Damage {self.stats.Damage_} ({dmg} {self.stats.DamageType}) - DR {victim.stats.DR_} = {injury} injury"
+                                            recordMsg $"Damage {self.stats.Damage_} ({dmg} {defaultArg self.stats.DamageType Other}) - DR {victim.stats.DR_} = {injury} injury"
                                             injury
                                     let mutable newConditions = []
                                     let hp' = victim.CurrentHP_ - injury
