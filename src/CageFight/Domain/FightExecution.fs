@@ -158,20 +158,21 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
     prioritizeTargets combat attacker |> Seq.tryHead
 
 let chooseDefense (victim: Combatant) =
+    let canRetreat = not (victim.retreatUsed || (List.includes [Dead; Unconscious; Stunned] victim.statusMods))
     let (|Parry|_|) = function
         | Some parry ->
             let parry = (parry - (if victim.stats.WeaponMaster then 2 else 4) * (victim.parriesUsed / (1 + victim.stats.ExtraParry_)))
-            Some(if victim.retreatUsed then parry, false else 1 + parry, true)
+            Some(if canRetreat then 1 + parry, true else parry, false)
         | None -> None
     let (|Block|_|) = function
         | Some block when victim.blockUsed = false ->
-            Some(if victim.retreatUsed then block, false else 1 + block, true)
+            Some(if canRetreat then 1 + block, true else block, false)
         | _ -> None
     let dodge, retreat =
         let dodge = if (float victim.CurrentHP_) >= (float victim.stats.HP_ / 3.)
                     then victim.stats.Dodge_
                     else victim.stats.Dodge_ / 2
-        if victim.retreatUsed then dodge, false else 3 + dodge, true
+        if canRetreat then 3 + dodge, true else dodge, false
     let target, defense =
         match victim.stats.Parry, victim.stats.Block with
         | Parry (parry, retreat), Block (block, _) when parry >= block && parry >= dodge ->

@@ -173,6 +173,8 @@ module List =
         | Some v -> [v]
     let every f =
         List.exists (f >> not) >> not
+    let includes values =
+        List.exists (fun v -> values |> List.contains v)
     let rec tryMapFold f state lst =
         match lst with
         | [] -> Ok state
