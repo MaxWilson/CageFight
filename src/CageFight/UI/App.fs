@@ -277,19 +277,23 @@ module App =
                                 prop.children [
                                     Html.td c.personalName
                                     Html.td c.CurrentHP_
-                                    Html.td (
+                                    Html.td [
                                         if c.statusMods |> List.contains Dead then
-                                            classTxt' "statusDead" Html.span "Dead"
+                                            prop.className "statusDead"
+                                            prop.text "Dead"
                                         elif c.statusMods |> List.contains Unconscious then
-                                            classTxt' "statusDead" Html.span "Unconscious"
+                                            prop.className "statusDead"
+                                            prop.text "Unconscious"
                                         else
                                             match c.statusMods with
                                             | [] ->
-                                                classTxt' "statusOk" Html.span "OK"
+                                                prop.className "statusOk"
+                                                prop.text "OK"
                                             | mods ->
                                                 let txt: string = mods |> List.distinct |> List.map toString |> List.sort |> String.join ", "
-                                                classTxt' "statusDisabled" Html.span txt
-                                        )
+                                                prop.className "statusDisabled"
+                                                prop.text txt
+                                        ]
                                     ]
                                 ]
                         ]
