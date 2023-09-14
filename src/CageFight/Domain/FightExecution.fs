@@ -221,26 +221,26 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
             let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
             attempt "Stay conscious" (self.stats.HT_ - penalty) |> not
         let mutable doneEarly = false
-        let self = cqrs.State.combatants[c]
-        if self.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
-            if self.statusMods |> List.exists ((=) Stunned) then
-                if attempt "Recover from stun" self.stats.HT_ then
-                    Unstun(self.Id, msg)
+        let attacker = cqrs.State.combatants[c]
+        if attacker.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
+            if attacker.statusMods |> List.exists ((=) Stunned) then
+                if attempt "Recover from stun" attacker.stats.HT_ then
+                    Unstun(attacker.Id, msg)
                 else
-                    Info(self.Id, "does nothing", msg)
+                    Info(attacker.Id, "does nothing", msg)
                 |> cqrs.Execute
-            elif self.CurrentHP_ <= 0 && (not self.stats.SupernaturalDurability) && checkGoesUnconscious self 0 then
-                FallUnconscious(self.Id, msg)
+            elif attacker.CurrentHP_ <= 0 && (not attacker.stats.SupernaturalDurability) && checkGoesUnconscious attacker 0 then
+                FallUnconscious(attacker.Id, msg)
                 |> cqrs.Execute
-            elif self.statusMods |> List.exists ((=) Prone) then
-                StandUp(self.Id, msg)
+            elif attacker.statusMods |> List.exists ((=) Prone) then
+                StandUp(attacker.Id, msg)
                 |> cqrs.Execute
             else
-                for n in 1..(self.stats.ExtraAttack_ + 1) do
+                for n in 1..(attacker.stats.ExtraAttack_ + 1) do
                     if (not doneEarly) then
-                        match self |> tryFindTarget cqrs.State with
+                        match attacker |> tryFindTarget cqrs.State with
                         | Some victim ->
-                            match detailedAttempt "Attack" (self.stats.WeaponSkill_ + self.shockPenalty) with
+                            match detailedAttempt "Attack" (attacker.stats.WeaponSkill_ + attacker.shockPenalty) with
                             | (Success _ | CritSuccess _) as success ->
                                 let defenseTarget, defense = chooseDefense victim
                                 let defenseLabel =
@@ -248,12 +248,12 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                     + (if defense.targetRetreated then " and retreat" else "")
                                 let critSuccess = match success with CritSuccess _ -> true | _ -> false
                                 if (not critSuccess) && attempt defenseLabel defenseTarget then
-                                    SuccessfulDefense({ attacker = self.Id; target = victim.Id }, defense, msg)
+                                    SuccessfulDefense({ attacker = attacker.Id; target = victim.Id }, defense, msg)
                                 else
-                                    let dmg = self.stats.Damage_.roll() |> max (if self.stats.DamageType = Some Crushing then 0 else 1)
+                                    let dmg = attacker.stats.Damage_.roll() |> max (if attacker.stats.DamageType = Some Crushing then 0 else 1)
                                     let penetratingDmg = dmg - victim.stats.DR_ |> max 0
                                     let toInjury (penetratingDmg, damageType) =
-                                        match self.stats.InjuryTolerance, damageType with
+                                        match victim.stats.InjuryTolerance, damageType with
                                         | Some Diffuse, Some (Impaling | Piercing) -> max 1 penetratingDmg
                                         | Some Diffuse, _ -> max 2 penetratingDmg
                                         | Some Homogeneous, Some Impaling -> penetratingDmg / 2
@@ -263,17 +263,17 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                         | _, Some Cutting -> (float penetratingDmg * 1.5) |> int
                                         | _, Some Impaling -> penetratingDmg * 2
                                         | _ -> penetratingDmg
-                                    let injury = toInjury (penetratingDmg, self.stats.DamageType)
+                                    let injury = toInjury (penetratingDmg, attacker.stats.DamageType)
                                     // add followup damage, and log the total damage and injury
                                     let injury =
-                                        match self.stats.FollowupDamage with
+                                        match attacker.stats.FollowupDamage with
                                         | Some r when penetratingDmg > 0 ->
-                                            let followup, followupType = (r.roll(), self.stats.FollowupDamageType)
+                                            let followup, followupType = (r.roll(), attacker.stats.FollowupDamageType)
                                             let injury = injury + toInjury (followup, followupType)
-                                            recordMsg $"Damage {self.stats.Damage_} + {r} ({dmg} {defaultArg self.stats.DamageType Other}, {followup} {followupType}) - DR {victim.stats.DR_} = {injury} injury"
+                                            recordMsg $"Damage {attacker.stats.Damage_} + {r} ({dmg} {defaultArg attacker.stats.DamageType Other}, {followup} {followupType}) - DR {victim.stats.DR_} = {injury} injury"
                                             injury
                                         | _ ->
-                                            recordMsg $"Damage {self.stats.Damage_} ({dmg} {defaultArg self.stats.DamageType Other}) - DR {victim.stats.DR_} = {injury} injury"
+                                            recordMsg $"Damage {attacker.stats.Damage_} ({dmg} {defaultArg attacker.stats.DamageType Other}) - DR {victim.stats.DR_} = {injury} injury"
                                             injury
                                     let mutable newConditions = []
                                     let hp' = victim.CurrentHP_ - injury
@@ -288,12 +288,12 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                         newConditions <- [Unconscious]
                                     elif injury > (victim.stats.HP_ + 1) / 2 && (not victim.stats.SupernaturalDurability) && (attempt "Knockdown check" victim.stats.HT_ |> not) then
                                         newConditions <- [Stunned; Prone]
-                                    Hit({ attacker = self.Id; target = victim.Id }, { defense = Parry; targetRetreated = false }, injury, newConditions, msg)
+                                    Hit({ attacker = attacker.Id; target = victim.Id }, { defense = Parry; targetRetreated = false }, injury, newConditions, msg)
                             | (Fail _ | CritFail _) ->
-                                Miss({ attacker = self.Id; target = victim.Id }, msg)
+                                Miss({ attacker = attacker.Id; target = victim.Id }, msg)
                         | None ->
                             doneEarly <- true
-                            Info(self.Id, "can't find a victim", msg)
+                            Info(attacker.Id, "can't find a victim", msg)
                         |> cqrs.Execute
                         msg <- "" // if multiple attacks process we don't want to redisplay the same text
 
