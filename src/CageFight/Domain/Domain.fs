@@ -88,7 +88,7 @@ module Core =
         // notice: Parry and Block do not exist by default
         member this.ExtraAttack_ = defaultArg this.ExtraAttack 0
         member this.ExtraParry_ = defaultArg this.ExtraParry 0
-
+        member this.WeaponSkill_ = defaultArg this.WeaponSkill 10
         member this.Damage_ =
             let addWeaponMasterDamage = function
                 | RollSpec(n, d, rest) as roll when this.WeaponMaster ->

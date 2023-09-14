@@ -15,6 +15,8 @@ importSideEffects "../sass/main.sass"
 
 [<Emit("$0.scrollIntoView({block: 'nearest', inline: 'nearest'})")>]
 let scrollIntoView (element: Browser.Types.Node) = jsNative
+[<Emit("$0.scrollIntoView({block: 'start', inline: 'nearest'})")>]
+let scrollSectionIntoView (element: Browser.Types.Node) = jsNative
 
 module App =
     type Page =
@@ -253,7 +255,7 @@ module App =
             editNumberNoHint "Parry" (stats.Parry, (fun n -> { stats with Parry = n } |> update))
             editNumberNoHint "Block" (stats.Block, (fun n -> { stats with Block = n } |> update))
             editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
-            editNumber "Weapon Skill" 10 (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
+            editNumber "Weapon Skill" stats.WeaponSkill_ (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
             editDamage "Damage" stats update
             editDamageType "Damage type" None (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with DamageType = v } |> update))
             editRollSpec "Followup damage" (stats.FollowupDamage, (fun r -> { stats with FollowupDamage = r } |> update))
@@ -311,7 +313,7 @@ module App =
                     ]
                 ]
             class' "logButtons" Html.div [
-                let setIndex newIndex _ =
+                let setIndex gotoNearest newIndex _ =
                     if newIndex >= 0 && newIndex < combatLog.Length then
                         setCurrentIndex newIndex
                         setCombat (combatLog.[newIndex] |> snd)
@@ -319,24 +321,24 @@ module App =
                         let log = (Browser.Dom.document.getElementsByClassName "logEntries")[0]
                         let entry =
                             log.childNodes[newIndex]
-                        entry |> scrollIntoView
+                        if gotoNearest then scrollIntoView entry else scrollSectionIntoView entry
                 let changeIndex delta =
                     let newIndex = currentIndex + delta
-                    setIndex newIndex
+                    setIndex true newIndex
                 let priorRound _ =
                     match combatLog
                             |> List.mapi Tuple2.create
                             |> List.tryFindIndexBack (function (ix, ((None | Some (NewRound _)), _)) when ix < currentIndex -> true | _ -> false)
                             with
-                    | Some ix -> setIndex ix ()
-                    | None -> setIndex 0 () // should only happen when we're already at the front
+                    | Some ix -> setIndex false ix ()
+                    | None -> setIndex false 0 () // should only happen when we're already at the front
                 let nextRound _ =
                     match combatLog
                             |> List.mapi Tuple2.create
                             |> List.tryFindIndex (function (ix, (Some (NewRound _), _)) when (currentIndex = 0 || ix > currentIndex) -> true | _ -> false)
                             with
-                    | Some ix -> setIndex ix ()
-                    | None -> setIndex (combatLog.Length - 1) ()
+                    | Some ix -> setIndex false ix ()
+                    | None -> setIndex false (combatLog.Length - 1) ()
                 Html.button [prop.text "<<"; prop.onClick priorRound]
                 Html.button [prop.text "<"; prop.onClick (changeIndex -1)]
                 Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
