@@ -12,7 +12,7 @@ type Combatant = {
     injuryTaken: int
     shockPenalty: int
     statusMods: Status list
-    retreatUsed: bool
+    retreatUsed: CombatantId option
     blockUsed: bool
     parriesUsed: int
     }
@@ -27,7 +27,7 @@ type Combatant = {
             injuryTaken = 0
             shockPenalty = 0
             statusMods = []
-            retreatUsed = false
+            retreatUsed = None
             blockUsed = false
             parriesUsed = 0
             }
@@ -42,12 +42,13 @@ type Ids =
     member this.Target_ = snd this.target
     member this.TargetTeam_ = fst this.target
 type DefenseType = Parry | Block | Dodge
-type DefenseDetails = { defense: DefenseType; targetRetreated: bool }
+type DefenseDetails = { defense: DefenseType; retreatFrom: CombatantId option }
+    with member this.targetRetreated = this.retreatFrom.IsSome
 
 [<AutoOpen>]
 module CombatEvents =
     type Event =
-        | Hit of Ids * DefenseDetails * injury:int * Status list * string
+        | Hit of Ids * DefenseDetails option * injury:int * Status list * string
         | SuccessfulDefense of Ids * DefenseDetails * string
         | Miss of Ids * string
         | FallUnconscious of CombatantId * string
@@ -61,17 +62,20 @@ module CombatEvents =
                 combatants =
                     model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None)
                 }
-        let consumeDefense (id: CombatantId) (defense: DefenseDetails) =
+        let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
             updateCombatant id (fun c ->
-                { c with
-                    retreatUsed = c.retreatUsed || defense.targetRetreated
-                    blockUsed = c.blockUsed || defense.defense = Block
-                    parriesUsed = c.parriesUsed + (if defense.defense = Parry then 1 else 0)
-                    })
+                match defense with
+                | Some defense ->
+                    { c with
+                        retreatUsed = c.retreatUsed |> Option.orElse defense.retreatFrom
+                        blockUsed = c.blockUsed || defense.defense = Block
+                        parriesUsed = c.parriesUsed + (if defense.defense = Parry then 1 else 0)
+                        }
+                | None -> c)
         let newTurn (id: CombatantId) =
             updateCombatant id (fun c ->
                 { c with
-                    retreatUsed = false
+                    retreatUsed = None
                     blockUsed = false
                     parriesUsed = 0
                     shockPenalty = 0
@@ -92,7 +96,7 @@ module CombatEvents =
                   |> takeDamage ids.target injury statusImpact
         | SuccessfulDefense(ids, defense, rollDetails) ->
             model |> newTurn ids.attacker
-                  |> consumeDefense ids.target defense
+                  |> consumeDefense ids.target (Some defense)
         | Miss (ids, rollDetails) ->
             model |> newTurn ids.attacker
         | FallUnconscious(id, rollDetails) ->
@@ -157,33 +161,39 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
 let tryFindTarget (combat: Combat) (attacker: Combatant) =
     prioritizeTargets combat attacker |> Seq.tryHead
 
-let chooseDefense (victim: Combatant) =
-    let canRetreat = not (victim.retreatUsed || (List.includes [Dead; Unconscious; Stunned] victim.statusMods))
+let chooseDefense (attacker: CombatantId) (victim: Combatant) =
+    let canRetreat =
+        (not <| List.includes [Dead; Unconscious; Stunned] victim.statusMods)
+        && (
+        match victim.retreatUsed with
+        | Some id when id = attacker -> true
+        | None -> true
+        | _ -> false)
     let (|Parry|_|) = function
         | Some parry ->
             let parry = (parry - (match victim.stats.WeaponMaster, victim.stats.FencingParry with | true, true -> 1 | true, false | false, true -> 2 | otherwise -> 4) * (victim.parriesUsed / (1 + victim.stats.ExtraParry_)))
-            Some(if canRetreat then (if victim.stats.FencingParry then 3 else 1) + parry, true else parry, false)
+            Some(if canRetreat then (if victim.stats.FencingParry then 3 else 1) + parry, Some attacker else parry, None)
         | None -> None
     let (|Block|_|) = function
         | Some block when victim.blockUsed = false ->
-            Some(if canRetreat then 1 + block, true else block, false)
+            Some(if canRetreat then 1 + block, Some attacker else block, None)
         | _ -> None
     let dodge, retreat =
         let dodge = if (float victim.CurrentHP_) >= (float victim.stats.HP_ / 3.)
                     then victim.stats.Dodge_
                     else victim.stats.Dodge_ / 2
-        if canRetreat then 3 + dodge, true else dodge, false
+        if canRetreat then 3 + dodge, Some attacker else dodge, None
     let target, defense =
         match victim.stats.Parry, victim.stats.Block with
         | Parry (parry, retreat), Block (block, _) when parry >= block && parry >= dodge ->
             // I guess we'll use parry in this case because we have to pick something
-            parry, { defense = Parry; targetRetreated = retreat }
+            parry, { defense = Parry; retreatFrom = retreat }
         | _, Block (block, retreat) when block >= dodge ->
-            block, { defense = Block; targetRetreated = retreat }
+            block, { defense = Block; retreatFrom = retreat }
         | Parry (parry, retreat), _ when parry >= dodge ->
-            parry, { defense = Parry; targetRetreated = retreat }
+            parry, { defense = Parry; retreatFrom = retreat }
         | _ ->
-            dodge, { defense = Dodge; targetRetreated = retreat }
+            dodge, { defense = Dodge; retreatFrom = retreat }
     let target =
         target
         + (if victim.statusMods |> List.contains Stunned then -4 else 0)
@@ -249,7 +259,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                 | n -> n, 0
                             match detailedAttempt "Attack" skill with
                             | (Success _ | CritSuccess _) as success ->
-                                let defenseTarget, defense = chooseDefense victim
+                                let defenseTarget, defense = chooseDefense attacker.Id victim
                                 let defenseLabel =
                                     (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
                                     + (if defense.targetRetreated then " and retreat" else "")
@@ -257,6 +267,9 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                 if (not critSuccess) && attempt defenseLabel (defenseTarget - defensePenalty) then
                                     SuccessfulDefense({ attacker = attacker.Id; target = victim.Id }, defense, msg)
                                 else
+                                    let defense =
+                                        if critSuccess then None
+                                        else Some defense
                                     let damageCap damageType = max (if damageType = Some Crushing then 0 else 1)
                                     let dmg = attacker.stats.Damage_.roll() |> damageCap attacker.stats.DamageType
                                     let penetratingDmg = dmg - victim.stats.DR_ |> max 0
@@ -296,7 +309,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                         newConditions <- [Unconscious]
                                     elif injury > (victim.stats.HP_ + 1) / 2 && (not victim.stats.SupernaturalDurability) && (attempt "Knockdown check" victim.stats.HT_ |> not) then
                                         newConditions <- [Stunned; Prone]
-                                    Hit({ attacker = attacker.Id; target = victim.Id }, { defense = Parry; targetRetreated = false }, injury, newConditions, msg)
+                                    Hit({ attacker = attacker.Id; target = victim.Id }, defense, injury, newConditions, msg)
                             | (Fail _ | CritFail _) ->
                                 Miss({ attacker = attacker.Id; target = victim.Id }, msg)
                         | None ->

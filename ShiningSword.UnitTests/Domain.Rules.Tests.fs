@@ -5,6 +5,10 @@ open Domain.Random
 open Domain.FightExecution
 let verify = Swensen.Unquote.Assertions.test
 
+// Slightly simpler version of DefenseDetails to make test output easier to read
+type DefenseResult = { defense: DefenseType; targetRetreated: bool }
+    with static member create (targetNumber, input: DefenseDetails) = targetNumber, { defense = input.defense; targetRetreated = input.retreatFrom.IsSome }
+
 [<Tests>]
 let Tests = testLabel "Domain" <| testList "Rules" [
     testCase "Spot check damage computations" <| fun () ->
@@ -13,23 +17,28 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         verify <@ thrustDamage 3 0 = RollSpec.create(1,6,-5) @>
         verify <@ thrustDamage 37 +3 = RollSpec.create(4,6,+3) @>
     testCase "Spot check defense choice" <| fun () ->
-        let create dodge parry block retreat =
+        let previousAttacker = (2, "Ogre 1")
+        let attacker = (2, "Ogre 2")
+        let create dodge parry block retreatUsed =
             let stats = { Creature.create("test") with Dodge = Some dodge; Parry = Some parry; Block = Some block }
-            { Combatant.fresh(1, "test1", 1, stats) with retreatUsed = retreat }
+            { Combatant.fresh(1, "test1", 1, stats) with retreatUsed = if retreatUsed then Some previousAttacker else None }
         let chooseDefenseWith f dodge parry block retreat parriesUsed =
             let combatant = create dodge parry block retreat
             let combatant = { combatant with parriesUsed = parriesUsed; stats = f combatant.stats }
-            chooseDefense combatant
+            chooseDefense attacker combatant |> DefenseResult.create
         let chooseDefenseWithExtraParry dodge parry block retreat extraParries parriesUsed =
             chooseDefenseWith (fun stats -> { stats with ExtraParry = Some extraParries }) dodge parry block retreat parriesUsed
         let chooseDefenseWithExtraParryF f dodge parry block retreat extraParries parriesUsed =
             chooseDefenseWith (fun stats -> { stats with ExtraParry = Some extraParries } |> f) dodge parry block retreat parriesUsed
         let chooseDefenseUnderConditions dodge parry block retreat damage conditions =
             let combatant = { create dodge parry block retreat with statusMods = conditions; injuryTaken = damage }
-            chooseDefense combatant
+            chooseDefense attacker combatant |> DefenseResult.create
+        let chooseDefenseWithPriorRetreat dodge parry block previousRetreat =
+            let combatant = { create dodge parry block false with retreatUsed = Some previousRetreat }
+            chooseDefense attacker combatant |> DefenseResult.create
         let chooseDefense dodge parry block retreat =
             let combatant = create dodge parry block retreat
-            chooseDefense combatant
+            chooseDefense attacker combatant |> DefenseResult.create
         verify <@ chooseDefense 10 0 0 true = (10, { defense = Dodge; targetRetreated = false })  @>
         verify <@ chooseDefense 10 13 9 true = (13, { defense = Parry; targetRetreated = false }) @>
         verify <@ chooseDefense 10 9 14 true = (14, { defense = Block; targetRetreated = false }) @>
@@ -61,6 +70,9 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         verify <@ chooseDefenseWeaponMasterBroadsword 10 17 0 true 0 3 = (11, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWeaponMasterFencing 10 17 0 true 0 3 = (14, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWeaponMasterFencing 10 17 0 false 0 3 = (17, { defense = Parry; targetRetreated = true })  @>
+        // prove that retreat works across multiple defenses
+        verify <@ chooseDefenseWithPriorRetreat 10 0 0 previousAttacker = (10, { defense = Dodge; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithPriorRetreat 10 0 0 attacker = (13, { defense = Dodge; targetRetreated = true })  @>
 
     testCase "Spot check target prioritization" <| fun () ->
         let attacker =
