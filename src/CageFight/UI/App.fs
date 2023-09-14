@@ -135,7 +135,12 @@ module App =
                         Html.text name
                         ]
             ]
-
+    let checkbox ctor (label: string) (isChecked, update) =
+        ctor [
+            let chkid = $"checkbox_{label}"
+            Html.label [prop.text label; prop.for' chkid]
+            Html.input [prop.type'.checkbox; prop.id chkid; prop.isChecked isChecked; prop.readOnly true; prop.onCheckedChange update]
+            ]
     let labeled (label: string) (inner: ReactElement) =
         Html.div [
             Html.text label
@@ -233,11 +238,7 @@ module App =
         let editDamageType = editDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
         let editInjuryTolerance = editDropdown(toString, (function "Unliving" -> Some Unliving | "Homogeneous" -> Some Homogeneous  | "Diffuse" -> Some Diffuse | _ -> None))
         let editBool label (value: bool, update) =
-            labeled label <| Html.input [
-                prop.type'.checkbox
-                prop.isChecked value
-                prop.onCheckedChange update
-                ]
+            checkbox Html.div label (value, update)
         class' "editView" Html.div [
             editString "Name" "" (Some stats.name, (fun txt -> { stats with name = defaultArg txt "" } |> update))
             editString "Pluralized" (stats.name + "s") (stats.pluralName, (fun txt -> { stats with pluralName = txt } |> update))
@@ -343,10 +344,7 @@ module App =
                 Html.button [prop.text "<"; prop.onClick (changeIndex -1)]
                 Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
                 Html.button [prop.text ">>"; prop.onClick nextRound]
-                Html.span [
-                    Html.text "Show rolls"
-                    Html.input [prop.type'.checkbox; prop.isChecked showRolls; prop.onCheckedChange setShowRolls]
-                    ]
+                checkbox Html.span "Show rolls" (showRolls, setShowRolls)
                 ]
             class' "logEntries" Html.div [
                 for (ix, (msg, state)) in combatLog |> List.mapi Tuple2.create do
