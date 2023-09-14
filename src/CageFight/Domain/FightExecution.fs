@@ -199,20 +199,19 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
         let recordMsg txt =
             if msg = "" then msg <- txt else msg <- $"{msg}; {txt}"
         let detailedAttempt label targetNumber =
-            let targetNumber = min 16 targetNumber
             let roll = d.roll()
             match successTest targetNumber roll with
             | CritSuccess _ as success ->
-                recordMsg $"{label} critically succeeded (needed {targetNumber}, rolled {roll})"
+                recordMsg $"{label} critically succeeded (target {targetNumber}, rolled {roll})"
                 success
             | Success _ as success ->
-                recordMsg $"{label} succeeded (needed {targetNumber}, rolled {roll})"
+                recordMsg $"{label} succeeded (target {targetNumber}, rolled {roll})"
                 success
             | Fail _ as fail ->
-                recordMsg $"{label} failed (needed {targetNumber}, rolled {roll})"
+                recordMsg $"{label} failed (target {targetNumber}, rolled {roll})"
                 fail
             | CritFail _ as fail ->
-                recordMsg $"{label} failed (needed {targetNumber}, rolled {roll})"
+                recordMsg $"{label} failed (target {targetNumber}, rolled {roll})"
                 fail
         let attempt label targetNumber =
             match detailedAttempt label targetNumber with
