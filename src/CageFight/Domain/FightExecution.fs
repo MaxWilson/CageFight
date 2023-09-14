@@ -151,9 +151,7 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
 let chooseDefense (victim: Combatant) =
     let (|Parry|_|) = function
         | Some parry ->
-            printfn $"{victim.personalName} has a parry of {parry}"
             let parry = (parry - (if victim.stats.WeaponMaster then 2 else 4) * (victim.parriesUsed / (1 + victim.stats.ExtraParry_)))
-            printfn $"{victim.personalName} has a modified parry of {parry}"
             Some(if victim.retreatUsed then parry, false else 1 + parry, true)
         | None -> None
     let (|Block|_|) = function
@@ -180,7 +178,6 @@ let chooseDefense (victim: Combatant) =
         target
         + (if victim.statusMods |> List.contains Stunned then -4 else 0)
         + (if victim.statusMods |> List.contains Prone then -3 else 0)
-    printfn "Choosing defense for %s: %A" victim.personalName defense
     target, defense
 
 let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
@@ -351,9 +348,6 @@ let calibrate db team1 (enemyType, minbound, maxbound, defeatCriteria) =
     let inbounds n = betweenInclusive (minbound * 10. |> int) (maxbound * 10. |> int) (get n |> fst)
     match upToOneHundred |> List.filter inbounds with
     | [] ->
-        for n in 1..100 do
-            let victories, sampleLog = get n
-            printfn $"against {n} {enemyType}: {victories} victories"
         None, None, None
     | inbounds ->
         let min = inbounds |> List.min

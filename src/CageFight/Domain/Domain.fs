@@ -159,7 +159,7 @@ module Parser =
         | OWSStr "Extra Attack" (Int (v, rest)) -> Some((fun c -> { c with ExtraAttack = Some v }), rest)
         | OWSStr "Extra Parry" (Int (v, rest)) -> Some((fun c -> { c with ExtraParry = Some v }), rest)
         | OWSStr "Unliving" rest -> Some((fun c -> { c with InjuryTolerance = Some Unliving }), rest)
-        | OWSStr "Homogenous" rest -> Some((fun c -> { c with InjuryTolerance = Some Homogenous }), rest)
+        | OWSStr "Homogeneous" rest -> Some((fun c -> { c with InjuryTolerance = Some Homogenous }), rest)
         | OWSStr "Diffuse" rest -> Some((fun c -> { c with InjuryTolerance = Some Diffuse }), rest)
         | OWSStr "Supernatural Durability" rest -> Some((fun c -> { c with SupernaturalDurability = true }), rest)
         | OWSStr "Unnatural" rest -> Some((fun c -> { c with UnnaturallyFragile = true }), rest)
@@ -183,14 +183,17 @@ module Defaults =
     open Packrat
     let database() =
         [
-            let parse (input: string) = match ParseArgs.Init input with | Parser.Creature(c, End) -> c | _ -> shouldntHappen input
+            let parse (input: string) =
+                match ParseArgs.Init input with
+                | Parser.Creature(c, End) -> c
+                | _ -> shouldntHappen input
             parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 DR 4 Skill 18 sw+1 cut Extra Attack 5 Extra Parry 5 Parry 13 Dodge 10 Supernatural Durability"
             parse "Orc: ST 12 DX 11 IQ 9 HT 11 DR 2 HP 14 Dodge 7 Parry 9 Block 9 Skill 13 sw+1 cut"
             parse "Ogre: ST 20 DX 11 IQ 7 HT 13 Skill 16 3d+7 cr Parry 11 DR 3"
             parse "Slugbeast: ST 16 IQ 2 Skill 12 1d+2"
             parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp DR 2 Speed 8 Parry 10 Block 10 Unliving Unnatural"
             parse "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
-            parse "Rock Mite: ST 12 HT 13 DR 5 Homogenous Skill 10 1d-1 cut + followup 2d burn"
+            parse "Rock Mite: ST 12 HT 13 DR 5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
             ]
         |> List.map(fun c -> c.name, c)
         |> Map.ofList
