@@ -219,7 +219,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
             | (CritFail _ | Fail _) -> false
         let checkGoesUnconscious (self: Combatant) incomingDamage =
             let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
-            attempt "Stay conscious" (self.stats.HT_ - penalty) |> not
+            attempt "Stay conscious" (self.stats.HT_ + penalty) |> not
         let mutable doneEarly = false
         let attacker = cqrs.State.combatants[c]
         if attacker.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
