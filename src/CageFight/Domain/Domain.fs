@@ -35,6 +35,7 @@ module Core =
         DR: int prop
         Dodge: int prop
         Parry: int prop
+        FencingParry: bool
         Block: int prop
         ExtraAttack: int prop
         ExtraParry: int prop
@@ -68,6 +69,7 @@ module Core =
               DR = None
               Dodge = None
               Parry = None
+              FencingParry = false
               Block = None
               ExtraAttack = None
               ExtraParry = None
@@ -149,6 +151,7 @@ module Parser =
         | OWSStr "DR" (Int (v, rest)) -> Some((fun c -> { c with DR = Some v }), rest)
         | OWSStr "Speed" (Decimal (v, rest)) -> Some((fun c -> { c with Speed = Some v }), rest)
         | OWSStr "Dodge" (Int (v, rest)) -> Some((fun c -> { c with Dodge = Some v }), rest)
+        | OWSStr "Parry" (Int (v, Str "F" rest)) -> Some((fun c -> { c with Parry = Some v; FencingParry = true }), rest)
         | OWSStr "Parry" (Int (v, rest)) -> Some((fun c -> { c with Parry = Some v }), rest)
         | OWSStr "Block" (Int (v, rest)) -> Some((fun c -> { c with Block = Some v }), rest)
         | OWSStr "Weapon Master" rest -> Some((fun c -> { c with WeaponMaster = true }), rest)
@@ -194,6 +197,7 @@ module Defaults =
             parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp DR 2 Speed 8 Parry 10 Block 10 Unliving Unnatural"
             parse "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
             parse "Rock Mite: ST 12 HT 13 Speed 5.00 DR 5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
+            parse "Inigo Montoya: ST 13 DX 16 IQ 11 HT 12 Speed 8.5 Dodge 12 Parry 17F DR 1 Weapon Master Skill 22 thr+2 imp Extra Attack 1"
             ]
         |> List.map(fun c -> c.name, c)
         |> Map.ofList

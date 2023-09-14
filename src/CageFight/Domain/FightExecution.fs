@@ -161,8 +161,8 @@ let chooseDefense (victim: Combatant) =
     let canRetreat = not (victim.retreatUsed || (List.includes [Dead; Unconscious; Stunned] victim.statusMods))
     let (|Parry|_|) = function
         | Some parry ->
-            let parry = (parry - (if victim.stats.WeaponMaster then 2 else 4) * (victim.parriesUsed / (1 + victim.stats.ExtraParry_)))
-            Some(if canRetreat then 1 + parry, true else parry, false)
+            let parry = (parry - (match victim.stats.WeaponMaster, victim.stats.FencingParry with | true, true -> 1 | true, false | false, true -> 2 | otherwise -> 4) * (victim.parriesUsed / (1 + victim.stats.ExtraParry_)))
+            Some(if canRetreat then (if victim.stats.FencingParry then 3 else 1) + parry, true else parry, false)
         | None -> None
     let (|Block|_|) = function
         | Some block when victim.blockUsed = false ->
@@ -241,14 +241,21 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                     if (not doneEarly) then
                         match attacker |> tryFindTarget cqrs.State with
                         | Some victim ->
-                            match detailedAttempt "Attack" (attacker.stats.WeaponSkill_ + attacker.shockPenalty) with
+                            let skill, defensePenalty =
+                                match (attacker.stats.WeaponSkill_ + attacker.shockPenalty) with
+                                | n when n >= 18 ->
+                                    let deceptive = (n - 16)/2
+                                    recordMsg $"Using Deceptive Attack {deceptive}"
+                                    n - deceptive * 2, deceptive
+                                | n -> n, 0
+                            match detailedAttempt "Attack" skill with
                             | (Success _ | CritSuccess _) as success ->
                                 let defenseTarget, defense = chooseDefense victim
                                 let defenseLabel =
                                     (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
                                     + (if defense.targetRetreated then " and retreat" else "")
                                 let critSuccess = match success with CritSuccess _ -> true | _ -> false
-                                if (not critSuccess) && attempt defenseLabel defenseTarget then
+                                if (not critSuccess) && attempt defenseLabel (defenseTarget - defensePenalty) then
                                     SuccessfulDefense({ attacker = attacker.Id; target = victim.Id }, defense, msg)
                                 else
                                     let damageCap damageType = max (if damageType = Some Crushing then 0 else 1)

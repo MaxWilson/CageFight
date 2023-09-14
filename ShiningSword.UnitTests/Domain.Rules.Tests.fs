@@ -16,10 +16,14 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         let create dodge parry block retreat =
             let stats = { Creature.create("test") with Dodge = Some dodge; Parry = Some parry; Block = Some block }
             { Combatant.fresh(1, "test1", 1, stats) with retreatUsed = retreat }
-        let chooseDefenseWithExtraParry dodge parry block retreat extraParries parriesUsed =
+        let chooseDefenseWith f dodge parry block retreat parriesUsed =
             let combatant = create dodge parry block retreat
-            let combatant = { combatant with stats = { combatant.stats with ExtraParry = Some extraParries }; parriesUsed = parriesUsed }
+            let combatant = { combatant with parriesUsed = parriesUsed; stats = f combatant.stats }
             chooseDefense combatant
+        let chooseDefenseWithExtraParry dodge parry block retreat extraParries parriesUsed =
+            chooseDefenseWith (fun stats -> { stats with ExtraParry = Some extraParries }) dodge parry block retreat parriesUsed
+        let chooseDefenseWithExtraParryF f dodge parry block retreat extraParries parriesUsed =
+            chooseDefenseWith (fun stats -> { stats with ExtraParry = Some extraParries } |> f) dodge parry block retreat parriesUsed
         let chooseDefenseUnderConditions dodge parry block retreat damage conditions =
             let combatant = { create dodge parry block retreat with statusMods = conditions; injuryTaken = damage }
             chooseDefense combatant
@@ -44,10 +48,19 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 0 = (13, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 1 = (13, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 5 = (13, { defense = Parry; targetRetreated = false })  @>
+        let chooseDefenseWithFencingParry = chooseDefenseWithExtraParryF (fun s -> { s with FencingParry = true })
+        verify <@ chooseDefenseWithFencingParry 10 13 0 true 5 6 = (11, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 6 = (10, { defense = Dodge; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 10 13 0 true 5 7 = (10, { defense = Dodge; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 0 13 0 true 5 7 = (9, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWithExtraParry 0 17 14 true 0 3 = (14, { defense = Block; targetRetreated = false })  @>
+        let chooseDefenseWeaponMasterFencing args = chooseDefenseWithExtraParryF (fun s -> { s with WeaponMaster = true; FencingParry = true }) args
+        let chooseDefenseWeaponMasterBroadsword args = chooseDefenseWithExtraParryF (fun s -> { s with WeaponMaster = true }) args
+        verify <@ chooseDefenseWithExtraParry 10 17 0 true 0 3 = (10, { defense = Dodge; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithFencingParry 10 17 0 true 0 3 = (11, { defense = Parry; targetRetreated = false })  @>
+        verify <@ chooseDefenseWeaponMasterBroadsword 10 17 0 true 0 3 = (11, { defense = Parry; targetRetreated = false })  @>
+        verify <@ chooseDefenseWeaponMasterFencing 10 17 0 true 0 3 = (14, { defense = Parry; targetRetreated = false })  @>
+        verify <@ chooseDefenseWeaponMasterFencing 10 17 0 false 0 3 = (17, { defense = Parry; targetRetreated = true })  @>
 
     testCase "Spot check target prioritization" <| fun () ->
         let attacker =
