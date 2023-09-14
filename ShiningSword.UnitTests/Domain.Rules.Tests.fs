@@ -16,6 +16,14 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         verify <@ swingDamage 6 +2 = RollSpec.create(1,6,-1) @>
         verify <@ thrustDamage 3 0 = RollSpec.create(1,6,-5) @>
         verify <@ thrustDamage 37 +3 = RollSpec.create(4,6,+3) @>
+        let baseDamage st =
+            thrustDamage st 0, swingDamage st 0
+        verify <@ baseDamage 16 = (RollSpec.create(1,6,+1), RollSpec.create(2,6,+2)) @>
+        verify <@ baseDamage 45 = (RollSpec.create(5,6), RollSpec.create(7,6,+1)) @>
+        verify <@ baseDamage 70 = (RollSpec.create(8,6), RollSpec.create(10,6)) @>
+        verify <@ baseDamage 75 = (RollSpec.create(8,6,+2), RollSpec.create(10,6,+2)) @>
+        verify <@ baseDamage 100 = (RollSpec.create(11,6), RollSpec.create(13,6)) @>
+
     testCase "Spot check defense choice" <| fun () ->
         let previousAttacker = (2, "Ogre 1")
         let attacker = (2, "Ogre 2")
@@ -101,17 +109,4 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         let priority = prioritizeTargets combat attacker |> List.ofSeq |> List.map (fun c -> c.personalName)
         verify <@ priority
                     = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Stunned Dying Guy"; "Perfectly Fine Guy"] @>
-    testCase "Deathchecks" <| fun () ->
-        let deathChecks fullHP priorInjury newInjury action =
-            let hp = fullHP - priorInjury
-            let hp' = hp - newInjury
-            let deathCount = (hp - hp') / fullHP
-            for i in 1..deathCount do
-                action()
-            return deathCount > 0
-        let count () =
-            let mutable counter = 0
-            fun () -> counter <- counter + 1; counter
-        verify <@ deathchecks 10 6 8 @>
-        verify <@ deathchecks 10 6 8 = 1 @>
     ]

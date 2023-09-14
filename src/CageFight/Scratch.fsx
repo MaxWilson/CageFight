@@ -30,3 +30,13 @@ open Packrat
 open Domain.Parser
 match ParseArgs.Init "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural" with
 | Creature(c, End) -> printfn $"{c.name}: {c.InjuryTolerance}"
+
+let ticksToDice ticks =
+    // every 4 dice is +1d.
+    if ticks%4 = 3 then
+        (ticks + 1)/4, 6, - 1
+    else
+        ticks / 4, 6, ticks % 4
+
+for st in [8..20] do
+    printfn $"{st}: {ticksToDice (st-6)}"

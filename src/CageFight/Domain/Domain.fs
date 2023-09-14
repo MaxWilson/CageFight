@@ -7,22 +7,23 @@ module Core =
     type 't prop = 't option
     type DamageType = Cutting | Impaling | Crushing | Piercing | Burning | Other
     type DamageSpec = Explicit of RollSpec | Swing of int | Thrust of int
+    let ticksToDice ticks bonusOrPenalty =
+        // every 4 dice is +1d.
+        if ticks % 4 = 3 then
+            RollSpec.create((ticks + 1)/4, 6, -1 + bonusOrPenalty)
+        else
+            RollSpec.create(ticks / 4, 6, (ticks % 4) + bonusOrPenalty)
+    // Swing is (ST-6)/4 dice up to 26 (5d), then (ST+14)/8d dice up to 50 (8d), then (ST+30)/10 dice.
+    // Thrust is (ST-6)/8 dice (rounded up to the next 0.25 dice) up to 70 (8d), then (ST+10)/10.
     let swingDamage st bonusOrPenalty =
         if st < 9 then RollSpec.create(1,6, bonusOrPenalty + (st-12)/2)
-        elif st < 28 then
-            let nDice = 1 + ((st-9) / 4)
-            let bonus = (st-9) % 4 - 1
-            RollSpec.create(nDice, 6, bonusOrPenalty + bonus)
-        else
-            notImpl "Swing damage for ST 28+"
+        elif st < 26 then ticksToDice (st-6) bonusOrPenalty
+        elif st <= 50 then ticksToDice ((st+14) / 2) bonusOrPenalty
+        else ticksToDice ((st+30)*4/10) bonusOrPenalty
     let thrustDamage st bonusOrPenalty =
         if st < 13 then RollSpec.create(1,6, bonusOrPenalty + (st-14)/2)
-        elif st <= 40 then
-            let nDice = 1 + (st-11) / 8
-            let bonus = (st-11) / 2 % 4 - 1
-            RollSpec.create(nDice, 6, bonusOrPenalty + bonus)
-        else
-            notImpl "Thrust damage for ST 28+"
+        elif st <= 70 then ticksToDice ((st-6+1) / 2) bonusOrPenalty
+        else ticksToDice ((st+10+1)*4/10) bonusOrPenalty
     type InjuryTolerance = Unliving | Homogeneous | Diffuse
     type Creature = {
         name: string
