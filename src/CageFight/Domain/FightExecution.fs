@@ -278,15 +278,15 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                     let mutable newConditions = []
                                     let hp' = victim.CurrentHP_ - injury
                                     // -5 x max HP is auto-death
-                                    if hp' <= victim.stats.HP_ * (if self.stats.UnnaturallyFragile then -1 else -5) then
+                                    if hp' <= victim.stats.HP_ * (if victim.stats.UnnaturallyFragile then -1 else -5) then
                                         newConditions <- [Dead]
                                     // check for death if crossing a HP threshold, -1 x max HP or below
                                     elif hp' <= victim.stats.HP_ * -1 && ((hp' / victim.stats.HP_) <> (victim.CurrentHP_ / victim.stats.HP_)) && (attempt "Deathcheck" victim.stats.HT_ |> not) then
                                         newConditions <- [Dead]
                                     // check for unconsciousness on dropping to zero HP
-                                    elif self.CurrentHP_ > 0 && hp' <= 0 && (not self.stats.SupernaturalDurability) && checkGoesUnconscious victim injury then
+                                    elif victim.CurrentHP_ > 0 && hp' <= 0 && (not victim.stats.SupernaturalDurability) && checkGoesUnconscious victim injury then
                                         newConditions <- [Unconscious]
-                                    elif injury > (victim.stats.HP_ + 1) / 2 && (not self.stats.SupernaturalDurability) && (attempt "Knockdown check" victim.stats.HT_ |> not) then
+                                    elif injury > (victim.stats.HP_ + 1) / 2 && (not victim.stats.SupernaturalDurability) && (attempt "Knockdown check" victim.stats.HT_ |> not) then
                                         newConditions <- [Stunned; Prone]
                                     Hit({ attacker = self.Id; target = victim.Id }, { defense = Parry; targetRetreated = false }, injury, newConditions, msg)
                             | (Fail _ | CritFail _) ->
