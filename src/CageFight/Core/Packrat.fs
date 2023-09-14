@@ -133,6 +133,7 @@ let (|Optional|) (str: string) ((ctx, ix): ParseInput) =
 // set up some basic alphabets
 let alpha = Set.ofList ['A'..'Z'] + Set.ofList ['a'..'z']
 let numeric = Set.ofList ['0'..'9']
+let numericWithDecimal = Set.ofList ('.'::['0'..'9'])
 let whitespace = Set.ofList [' '; '\t'; '\n'; '\r']
 let alphanumeric = alpha + numeric
 let alphawhitespace = alpha + whitespace
@@ -229,6 +230,13 @@ let (|IntNoWhitespace|_|) = pack <| function
 let (|Int|_|) = pack <| function
     | OWS(Chars numeric (v, OWS(rest))) ->
         match System.Int32.TryParse(v) with
+        | true, v -> Some(v, rest)
+        | _ -> None
+    | _ -> None
+
+let (|Decimal|_|) = pack <| function
+    | OWS(Chars numericWithDecimal (v, OWS(rest))) ->
+        match System.Double.TryParse(v) with
         | true, v -> Some(v, rest)
         | _ -> None
     | _ -> None

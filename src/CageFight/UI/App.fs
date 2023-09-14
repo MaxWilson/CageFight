@@ -170,14 +170,18 @@ module App =
                 | Some v -> updateTxt (render v)
                 | None -> updateTxt "")
             ]
-    let editDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:string) (hint: 't) (value: 't option, options, update: 't option -> unit) =
+    let editDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:string) (defaultOption: string option) (value: 't option, options, update: 't option -> unit) =
         labeled label <| Html.select [
-            match value with
-            | Some value ->
+            match value, defaultOption with
+            | Some value, _ ->
                 prop.valueOrDefault (render value)
-            | None ->
-                prop.placeholder (render hint)
+            | _, Some hint ->
+                prop.valueOrDefault hint
+            | _ -> ()
             prop.children [
+                match defaultOption with
+                | Some v -> Html.option [prop.text v; prop.value v]
+                | None -> ()
                 for option in options do
                     Html.option [prop.text (render option); prop.value (render option)]
                 ]
@@ -223,7 +227,9 @@ module App =
         let editNumber = editData(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
         let editNumberNoHint = editDataNoHint(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
         let editDecimalNumber = editData(prop.type'.number, (fun v -> $"%.2f{v}"), (fun (input: string) -> match System.Double.TryParse input with true, n -> Some n | _ -> None))
+        let editRollSpec = editDataNoHint<RollSpec>(prop.type'.text, toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Random.Parser.Roll(r, Packrat.End) -> Some r | _ -> None))
         let editDamageType = editDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
+        let editInjuryTolerance = editDropdown(toString, (function "Unliving" -> Some Unliving | "Homogeneous" -> Some Homogeneous  | "Diffuse" -> Some Diffuse | _ -> None))
         let editBool label (value: bool, update) =
             labeled label <| Html.input [
                 prop.type'.checkbox
@@ -238,7 +244,10 @@ module App =
             editNumber "IQ" stats.IQ_ (stats.IQ, (fun n -> { stats with IQ = n } |> update))
             editNumber "HT" stats.HT_ (stats.HT, (fun n -> { stats with HT = n } |> update))
             editNumber "DR" stats.DR_ (stats.DR, (fun n -> { stats with DR = n } |> update))
+            editInjuryTolerance "Injury Tolerance" (Some "Normal") (stats.InjuryTolerance, [Unliving; Homogeneous; Diffuse], (fun v -> { stats with InjuryTolerance = v } |> update))
+            editBool "Immune to shock, stun, unconsciousness" (stats.SupernaturalDurability, (fun b -> { stats with SupernaturalDurability = b } |> update))
             editNumber "HP" stats.HP_ (stats.HP, (fun n -> { stats with HP = n } |> update))
+            editBool "Unnaturally fragile" (stats.UnnaturallyFragile, (fun b -> { stats with UnnaturallyFragile = b } |> update))
             editDecimalNumber "Speed" stats.Speed_ (stats.Speed, (fun n -> { stats with Speed = n } |> update))
             editNumber "Dodge" stats.Dodge_ (stats.Dodge, (fun n -> { stats with Dodge = n } |> update))
             editNumberNoHint "Parry" (stats.Parry, (fun n -> { stats with Parry = n } |> update))
@@ -246,7 +255,9 @@ module App =
             editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
             editNumber "Weapon Skill" 10 (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
             editDamage "Damage" stats update
-            editDamageType "Damage type" DamageType.Other (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Other], (fun v -> { stats with DamageType = v } |> update))
+            editDamageType "Damage type" None (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with DamageType = v } |> update))
+            editRollSpec "Followup damage" (stats.FollowupDamage, (fun r -> { stats with FollowupDamage = r } |> update))
+            editDamageType "Followup type" None (stats.FollowupDamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with FollowupDamageType = v } |> update))
             editNumber "Extra Attacks" stats.ExtraAttack_ (stats.ExtraAttack, (fun n -> { stats with ExtraAttack = n } |> update))
             editNumber "Extra Parries" stats.ExtraParry_ (stats.ExtraParry, (fun n -> { stats with ExtraParry = n } |> update))
 

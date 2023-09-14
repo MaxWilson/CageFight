@@ -23,7 +23,7 @@ module Core =
             RollSpec.create(nDice, 6, bonusOrPenalty + bonus)
         else
             notImpl "Thrust damage for ST 28+"
-    type InjuryTolerance = Unliving | Homogenous | Diffuse
+    type InjuryTolerance = Unliving | Homogeneous | Diffuse
     type Creature = {
         name: string
         pluralName: string prop
@@ -147,7 +147,7 @@ module Parser =
         | OWSStr "HT" (Int (v, rest)) -> Some((fun c -> { c with HT = Some v }), rest)
         | OWSStr "HP" (Int (v, rest)) -> Some((fun c -> { c with HP = Some v }), rest)
         | OWSStr "DR" (Int (v, rest)) -> Some((fun c -> { c with DR = Some v }), rest)
-        | OWSStr "Speed" (Int (v, rest)) -> Some((fun c -> { c with Speed = Some v }), rest)
+        | OWSStr "Speed" (Decimal (v, rest)) -> Some((fun c -> { c with Speed = Some v }), rest)
         | OWSStr "Dodge" (Int (v, rest)) -> Some((fun c -> { c with Dodge = Some v }), rest)
         | OWSStr "Parry" (Int (v, rest)) -> Some((fun c -> { c with Parry = Some v }), rest)
         | OWSStr "Block" (Int (v, rest)) -> Some((fun c -> { c with Block = Some v }), rest)
@@ -159,7 +159,7 @@ module Parser =
         | OWSStr "Extra Attack" (Int (v, rest)) -> Some((fun c -> { c with ExtraAttack = Some v }), rest)
         | OWSStr "Extra Parry" (Int (v, rest)) -> Some((fun c -> { c with ExtraParry = Some v }), rest)
         | OWSStr "Unliving" rest -> Some((fun c -> { c with InjuryTolerance = Some Unliving }), rest)
-        | OWSStr "Homogeneous" rest -> Some((fun c -> { c with InjuryTolerance = Some Homogenous }), rest)
+        | OWSStr "Homogeneous" rest -> Some((fun c -> { c with InjuryTolerance = Some Homogeneous }), rest)
         | OWSStr "Diffuse" rest -> Some((fun c -> { c with InjuryTolerance = Some Diffuse }), rest)
         | OWSStr "Supernatural Durability" rest -> Some((fun c -> { c with SupernaturalDurability = true }), rest)
         | OWSStr "Unnatural" rest -> Some((fun c -> { c with UnnaturallyFragile = true }), rest)
@@ -190,10 +190,10 @@ module Defaults =
             parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 DR 4 Skill 18 sw+1 cut Extra Attack 5 Extra Parry 5 Parry 13 Dodge 10 Supernatural Durability"
             parse "Orc: ST 12 DX 11 IQ 9 HT 11 DR 2 HP 14 Dodge 7 Parry 9 Block 9 Skill 13 sw+1 cut"
             parse "Ogre: ST 20 DX 11 IQ 7 HT 13 Skill 16 3d+7 cr Parry 11 DR 3"
-            parse "Slugbeast: ST 16 IQ 2 Skill 12 1d+2"
+            parse "Slugbeast: ST 16 IQ 2 Skill 12 1d+2 Homogeneous"
             parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp DR 2 Speed 8 Parry 10 Block 10 Unliving Unnatural"
             parse "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
-            parse "Rock Mite: ST 12 HT 13 DR 5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
+            parse "Rock Mite: ST 12 HT 13 Speed 5.00 DR 5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
             ]
         |> List.map(fun c -> c.name, c)
         |> Map.ofList

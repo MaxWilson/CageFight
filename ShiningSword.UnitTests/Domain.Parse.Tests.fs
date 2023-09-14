@@ -90,9 +90,10 @@ let AcceptanceTests() = testLabel "Acceptance tests" <| testList "Parsing" [
     testList "Rock Mite" [
         let verify, pverify = makeVerify()
         let creature = lazy(
-            parse (|Creature|_|)  "Rock Mite: ST 12 HT 13 DR 5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
+            parse (|Creature|_|)  "Rock Mite: ST 12 HT 13 DR 5 Speed 5.5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
             )
-        verify "Homogenous" <@ creature.Value.InjuryTolerance = Some Homogenous @>
+        verify "Speed" <@ creature.Value.Speed_ = 5.5 @>
+        verify "Homogeneous" <@ creature.Value.InjuryTolerance = Some Homogeneous @>
         verify "DR" <@ creature.Value.DR_ = 5 @>
         verify "Bite damage" <@ creature.Value.Damage_ = RollSpec.create(1,6,-1) && creature.Value.DamageType = Some Cutting @>
         verify "Lava damage" <@ creature.Value.FollowupDamage = Some (RollSpec.create(2,6)) && creature.Value.FollowupDamageType = Some Burning @>
