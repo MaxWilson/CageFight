@@ -298,11 +298,26 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                             injury
                                     let mutable newConditions = []
                                     let hp' = victim.CurrentHP_ - injury
+                                    let failedDeathcheck (fullHP: int) priorHP newHP =
+                                        if newHP <= fullHP * -1 then
+                                            let oldBracket = priorHP / fullHP |> max 0
+                                            let newBracket = newHP / fullHP
+                                            let checksNeeded = oldBracket - newBracket
+                                            let rec loop checksFinished =
+                                                let deathPoint = ((checksNeeded + newBracket) + checksFinished) * -fullHP
+                                                if checksFinished = checksNeeded then false // Zero or more
+                                                elif attempt $"Deathcheck at {deathPoint} HP" victim.stats.HT_ = false then
+                                                    true // failed!
+                                                else loop (checksFinished+1)
+                                            loop 0
+                                        else false
                                     // -5 x max HP is auto-death
-                                    if hp' <= victim.stats.HP_ * (if victim.stats.UnnaturallyFragile then -1 else -5) then
+                                    let autodeathThreshold = victim.stats.HP_ * (if victim.stats.UnnaturallyFragile then -1 else -5)
+                                    if hp' <= autodeathThreshold then
+                                        recordMsg $"Auto-death occurs at {autodeathThreshold} HP"
                                         newConditions <- [Dead]
                                     // check for death if crossing a HP threshold, -1 x max HP or below
-                                    elif hp' <= victim.stats.HP_ * -1 && ((hp' / victim.stats.HP_) <> (victim.CurrentHP_ / victim.stats.HP_)) && (attempt "Deathcheck" victim.stats.HT_ |> not) then
+                                    elif failedDeathcheck victim.stats.HP_ victim.CurrentHP_ hp' then
                                         newConditions <- [Dead]
                                     // check for unconsciousness on dropping to zero HP
                                     elif victim.CurrentHP_ > 0 && hp' <= 0 && (not victim.stats.SupernaturalDurability) && checkGoesUnconscious victim injury then

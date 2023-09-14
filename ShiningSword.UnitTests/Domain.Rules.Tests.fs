@@ -101,5 +101,17 @@ let Tests = testLabel "Domain" <| testList "Rules" [
         let priority = prioritizeTargets combat attacker |> List.ofSeq |> List.map (fun c -> c.personalName)
         verify <@ priority
                     = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Stunned Dying Guy"; "Perfectly Fine Guy"] @>
-
+    testCase "Deathchecks" <| fun () ->
+        let deathChecks fullHP priorInjury newInjury action =
+            let hp = fullHP - priorInjury
+            let hp' = hp - newInjury
+            let deathCount = (hp - hp') / fullHP
+            for i in 1..deathCount do
+                action()
+            return deathCount > 0
+        let count () =
+            let mutable counter = 0
+            fun () -> counter <- counter + 1; counter
+        verify <@ deathchecks 10 6 8 @>
+        verify <@ deathchecks 10 6 8 = 1 @>
     ]
