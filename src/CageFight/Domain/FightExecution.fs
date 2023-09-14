@@ -250,7 +250,8 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                 if (not critSuccess) && attempt defenseLabel defenseTarget then
                                     SuccessfulDefense({ attacker = attacker.Id; target = victim.Id }, defense, msg)
                                 else
-                                    let dmg = attacker.stats.Damage_.roll() |> max (if attacker.stats.DamageType = Some Crushing then 0 else 1)
+                                    let damageCap damageType = max (if damageType = Some Crushing then 0 else 1)
+                                    let dmg = attacker.stats.Damage_.roll() |> damageCap attacker.stats.DamageType
                                     let penetratingDmg = dmg - victim.stats.DR_ |> max 0
                                     let toInjury (penetratingDmg, damageType) =
                                         match victim.stats.InjuryTolerance, damageType with
@@ -268,7 +269,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                     let injury =
                                         match attacker.stats.FollowupDamage with
                                         | Some r when penetratingDmg > 0 ->
-                                            let followup, followupType = (r.roll(), attacker.stats.FollowupDamageType)
+                                            let followup, followupType = (r.roll() |> damageCap attacker.stats.FollowupDamageType, attacker.stats.FollowupDamageType)
                                             let injury = injury + toInjury (followup, followupType)
                                             recordMsg $"Damage {attacker.stats.Damage_} + {r} ({dmg} {defaultArg attacker.stats.DamageType Other}, {followup} {followupType}) - DR {victim.stats.DR_} = {injury} injury"
                                             injury
