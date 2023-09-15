@@ -200,6 +200,20 @@ let chooseDefense (attacker: CombatantId) (victim: Combatant) =
         + (if victim.statusMods |> List.contains Prone then -3 else 0)
     target, defense
 
+let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
+    if newHP <= fullHP * -1 then
+        let oldBracket = priorHP / fullHP |> min 0
+        let newBracket = newHP / fullHP
+        let checksNeeded = oldBracket - newBracket
+        let rec loop checksFinished =
+            let threshold = ((-oldBracket + 1) + checksFinished) * -fullHP
+            if checksFinished = checksNeeded then false // Zero or more
+            elif attempt threshold = false then
+                true // failed!
+            else loop (checksFinished+1)
+        loop 0
+    else false
+
 let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
     // HIGH speed and DX goes first so we use the negative of those values
     for c in cqrs.State.combatants.Values |> Seq.sortBy (fun c -> -c.stats.Speed_, -c.stats.DX_, c.stats.name, c.number) |> Seq.map (fun c -> c.Id) do
@@ -298,26 +312,14 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                             injury
                                     let mutable newConditions = []
                                     let hp' = victim.CurrentHP_ - injury
-                                    let failedDeathcheck (fullHP: int) priorHP newHP =
-                                        if newHP <= fullHP * -1 then
-                                            let oldBracket = priorHP / fullHP |> max 0
-                                            let newBracket = newHP / fullHP
-                                            let checksNeeded = oldBracket - newBracket
-                                            let rec loop checksFinished =
-                                                let deathPoint = ((checksNeeded + newBracket) + checksFinished) * -fullHP
-                                                if checksFinished = checksNeeded then false // Zero or more
-                                                elif attempt $"Deathcheck at {deathPoint} HP" victim.stats.HT_ = false then
-                                                    true // failed!
-                                                else loop (checksFinished+1)
-                                            loop 0
-                                        else false
                                     // -5 x max HP is auto-death
                                     let autodeathThreshold = victim.stats.HP_ * (if victim.stats.UnnaturallyFragile then -1 else -5)
                                     if hp' <= autodeathThreshold then
                                         recordMsg $"Auto-death occurs at {autodeathThreshold} HP"
                                         newConditions <- [Dead]
                                     // check for death if crossing a HP threshold, -1 x max HP or below
-                                    elif failedDeathcheck victim.stats.HP_ victim.CurrentHP_ hp' then
+                                    elif failedDeathcheck (fun threshold -> attempt $"Deathcheck at {threshold} HP" victim.stats.HT_)
+                                            victim.stats.HP_ victim.CurrentHP_ hp' then
                                         newConditions <- [Dead]
                                     // check for unconsciousness on dropping to zero HP
                                     elif victim.CurrentHP_ > 0 && hp' <= 0 && (not victim.stats.SupernaturalDurability) && checkGoesUnconscious victim injury then
