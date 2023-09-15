@@ -30,6 +30,9 @@ jobs:
           dotnet tool restore
           dotnet restore
           npm ci --prefix src
+      - name: Run tests
+        run: |
+          dotnet test
       - name: Build web app
         run: |
           npm run buildGithub --prefix src
