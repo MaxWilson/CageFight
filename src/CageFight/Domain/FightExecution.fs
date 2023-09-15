@@ -262,6 +262,8 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                         match attacker |> tryFindTarget cqrs.State with
                         | Some victim ->
                             let skill, defensePenalty =
+                                if attacker.shockPenalty <> 0 then
+                                    recordMsg $"Shock penalty %+d{attacker.shockPenalty}"
                                 match (attacker.stats.WeaponSkill_ + attacker.shockPenalty) with
                                 | n when n >= 18 ->
                                     let deceptive = (n - 16)/2
