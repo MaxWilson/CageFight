@@ -108,7 +108,7 @@ module Core =
         with
         static member fresh = { catalog = Map.empty }
         static member add (monster: Creature) (db: MonsterDatabase) =
-            { db with catalog = Map.add monster.name monster db.catalog }
+            { catalog = Map.add monster.name monster db.catalog }
 
 #nowarn "40" // we're not planning on doing any unsafe things during initialization, like evaluating the functions that rely on the object we're busy constructing
 module Parser =

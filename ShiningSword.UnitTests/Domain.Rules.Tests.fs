@@ -87,6 +87,7 @@ let Tests = testLabel "Unit" <| testList "Rules" [
             Combatant.fresh(1, "Andy", 1, Creature.create "Knight")
         let mutable counter = 2
         let create name injury conditions =
+            counter <- counter + 1
             { Combatant.fresh(2, name, counter, Creature.create "Target") with injuryTaken = injury; statusMods = conditions }
         // we put stunned and prone targets at high priority.
         // prefer targets that are stunned but not yet at -HP,
@@ -101,15 +102,15 @@ let Tests = testLabel "Unit" <| testList "Rules" [
                 create "Dead Guy" 100 [Dead]
                 create "Stunned Guy" 3 [Stunned]
                 create "Prone Guy" 3 [Prone]
-                create "Stunned Dying Guy" 23 [Stunned]
                 create "Hurt Guy" 8 []
+                create "Stunned Dying Guy" 23 [Stunned]
                 create "Badly Hurt Guy" 13 []
                 create "Dying Guy" 22 [Unconscious]
                 ]
             |> fun guys -> { combatants = guys |> List.map (fun c -> c.Id, c) |> Map.ofList }
         let priority = prioritizeTargets combat attacker |> List.ofSeq |> List.map (fun c -> c.personalName)
         verify <@ priority
-                    = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Perfectly Fine Guy"; "Badly Hurt Guy"; "Stunned Dying Guy"] @>
+                    = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Perfectly Fine Guy"; "Stunned Dying Guy"; "Badly Hurt Guy"; ] @>
     testCase "Spot check death check thresholds" <| fun () ->
         let getThresholds fullHP startFrom =
             let mutable thresholds = []

@@ -79,7 +79,7 @@ module App =
                 output
             else catalog
         let db =
-            { MonsterDatabase.fresh with catalog = LocalStorage.Catalog.read() |> updateWithDefaults }
+            { catalog = LocalStorage.Catalog.read() |> updateWithDefaults }
         let fight = {
             sideA = [3, "Peshkali"; 1, "Slugbeast"]
             sideB = Calibrate(Some "Orc", None, None, TPK)
@@ -286,7 +286,7 @@ module App =
                             ]
                         ]
                     Html.tbody [
-                        for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.stats.name, c.number) do
+                        for c in combat.combatants.Values |> Seq.sortBy(fun c -> c.team, c.number) do
                             Html.tr [
                                 prop.key c.personalName
                                 prop.className (if c.team = 1 then "teamBlue" else "teamRed")

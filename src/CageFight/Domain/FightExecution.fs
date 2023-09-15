@@ -58,9 +58,7 @@ module CombatEvents =
         | NewRound of int
     let update msg model =
         let updateCombatant id (f: Combatant -> Combatant) model =
-            { model with
-                combatants =
-                    model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None)
+            {   combatants = model.combatants |> Map.change id (function | Some c -> Some (f c) | None -> None)
                 }
         let consumeDefense (id: CombatantId) (defense: DefenseDetails option) =
             updateCombatant id (fun c ->
@@ -154,7 +152,6 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
             betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_ |> not,
             c.CurrentHP_ <= 0 && not c.stats.SupernaturalDurability,
-            c.stats.name,
             c.number)
     potentialTargets
 
@@ -352,10 +349,15 @@ let fight (cqrs: CQRS.CQRS<_,Combat>) =
             loop (counter + 1)
     loop 1
 
-let toCombatants (db: Map<string, Creature>) team (quantity, name:string) =
-    [for i in 1..quantity do
-        Combatant.fresh(team, (if quantity > 1 then $"{name} {i}" else name), i, db[name])
-        ]
+let toCombatants (db: Map<string, Creature>) team =
+    // we want numbers to ascend smoothly on a side, so that we can use numbers to prioritize targets in the same order they were in fightsetup
+    let mutable counter = 0
+    fun (quantity, name:string) ->
+        [   for i in 1..quantity do
+                Combatant.fresh(team, (if quantity > 1 then $"{name} {i}" else name), counter + i, db[name])
+            counter <- counter + quantity
+            ]
+
 let createCombat (db: Map<string, Creature>) team1 team2 =
     { combatants =
         (team1 |> List.collect (toCombatants db 1)) @ (team2 |> List.collect (toCombatants db 2))
