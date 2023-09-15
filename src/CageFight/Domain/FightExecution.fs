@@ -153,7 +153,7 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
             ((c.statusMods |> List.contains Prone)
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
             betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_ |> not,
-            c.CurrentHP_ <= 0 |> not,
+            c.CurrentHP_ <= 0 && not c.stats.SupernaturalDurability,
             c.stats.name,
             c.number)
     potentialTargets

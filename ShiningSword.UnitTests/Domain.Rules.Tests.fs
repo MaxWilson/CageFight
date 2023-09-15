@@ -103,12 +103,13 @@ let Tests = testLabel "Unit" <| testList "Rules" [
                 create "Prone Guy" 3 [Prone]
                 create "Stunned Dying Guy" 23 [Stunned]
                 create "Hurt Guy" 8 []
+                create "Badly Hurt Guy" 13 []
                 create "Dying Guy" 22 [Unconscious]
                 ]
             |> fun guys -> { combatants = guys |> List.map (fun c -> c.Id, c) |> Map.ofList }
         let priority = prioritizeTargets combat attacker |> List.ofSeq |> List.map (fun c -> c.personalName)
         verify <@ priority
-                    = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Stunned Dying Guy"; "Perfectly Fine Guy"] @>
+                    = ["Stunned Guy"; "Prone Guy"; "Hurt Guy"; "Perfectly Fine Guy"; "Badly Hurt Guy"; "Stunned Dying Guy"] @>
     testCase "Spot check death check thresholds" <| fun () ->
         let getThresholds fullHP startFrom =
             let mutable thresholds = []
