@@ -10,7 +10,7 @@ type DefenseResult = { defense: DefenseType; targetRetreated: bool }
     with static member create (targetNumber, input: DefenseDetails) = targetNumber, { defense = input.defense; targetRetreated = input.retreatFrom.IsSome }
 
 [<Tests>]
-let Tests = testLabel "Domain" <| testList "Rules" [
+let Tests = testLabel "Unit" <| testList "Rules" [
     testCase "Spot check damage computations" <| fun () ->
         verify <@ swingDamage 25 +2 = RollSpec.create(5,6,+1) @>
         verify <@ swingDamage 6 +2 = RollSpec.create(1,6,-1) @>

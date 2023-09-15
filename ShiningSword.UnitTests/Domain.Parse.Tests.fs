@@ -26,7 +26,7 @@ let parse (|Pattern|_|) input =
     | v -> parseFail v
 
 [<Tests>]
-let UnitTests() = (testLabel "Unit tests" << testLabel "Domain") <| testList "Parse" [
+let UnitTests() = (testLabel "Unit") <| testList "Parse" [
     let verify, pverify = makeVerify()
     verify "Basic roll" <@ parse (|Roll|_|) "3d6" = RollSpec.create(3,6) @>
     verify "Basic roll" <@ parse (|Roll|_|) "3d-1" = RollSpec.create(3,6,-1) @>
@@ -40,7 +40,7 @@ let UnitTests() = (testLabel "Unit tests" << testLabel "Domain") <| testList "Pa
     ]
 
 [<Tests>]
-let AcceptanceTests() = testLabel "Acceptance tests" <| testList "Parsing" [
+let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
     let weaponStats (c: Creature) = c.WeaponSkill.Value, c.Damage_, defaultArg c.DamageType Other
     testList "Bob" [
         let verify, pverify = makeVerify()
