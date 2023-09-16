@@ -374,6 +374,8 @@ module App =
                             | v when v |> List.contains Dead -> hit "kills"
                             | v when v |> List.contains Unconscious -> hit "KOs"
                             | v when v |> List.contains Stunned -> hit "stuns"
+                            | v when v |> List.contains Berserk ->
+                                div [name ids.attacker; Html.text $" drives "; name ids.target; Html.text $" berserk with a hit for {injury} HP"; viewDetails rollDetails]
                             | _ ->
                                 div [name ids.attacker; Html.text $" hits "; name ids.target; Html.text $" for {injury} HP"; viewDetails rollDetails]
                         | SuccessfulDefense(ids, { defense = Parry }, rollDetails) ->

@@ -26,7 +26,7 @@ type Combatant = {
             stats = stats
             injuryTaken = 0
             shockPenalty = 0
-            statusMods = []
+            statusMods = if stats.Berserk = Some Always then [Berserk] else []
             retreatUsed = None
             blockUsed = false
             parriesUsed = 0
@@ -285,7 +285,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                         (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
                                         + (if defense.targetRetreated then " and retreat" else "")
                                     let critSuccess = match success with CritSuccess _ -> true | _ -> false
-                                    if (not critSuccess) && attempt defenseLabel (defenseTarget - defensePenalty) then
+                                    if not (critSuccess || victim.statusMods |> List.contains Berserk) && attempt defenseLabel (defenseTarget - defensePenalty) then
                                         SuccessfulDefense({ attacker = attacker.Id; target = victim.Id }, defense, msg)
                                     else
                                         let defense =
