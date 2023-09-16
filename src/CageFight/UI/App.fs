@@ -256,10 +256,10 @@ module App =
             editDecimalNumber "Speed" stats.Speed_ (stats.Speed, (fun n -> { stats with Speed = n } |> update))
             editNumberNoHint "Parry" (stats.Parry, (fun n -> { stats with Parry = n } |> update))
             editBool "Fencing Parry" (stats.FencingParry, (fun b -> { stats with FencingParry = b } |> update))
-            editNumberNoHint "Block" (stats.Block, (fun n -> { stats with Block = n } |> update))
             editNumber "Dodge" stats.Dodge_ (stats.Dodge, (fun n -> { stats with Dodge = n } |> update))
-            editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
+            editNumberNoHint "Block" (stats.Block, (fun n -> { stats with Block = n } |> update))
             editNumber "Weapon Skill" stats.WeaponSkill_ (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
+            editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
             editDamage "Damage" stats update
             editDamageType "Damage type" (Some "Other") (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with DamageType = v } |> update))
             editRollSpec "Followup damage" (stats.FollowupDamage, (fun r -> { stats with FollowupDamage = r } |> update))
