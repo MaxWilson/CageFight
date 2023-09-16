@@ -6,7 +6,25 @@ module Core =
 
     type 't prop = 't option
     type DamageType = Cutting | Impaling | Crushing | Piercing | Burning | Other
+        with
+        member this.abbreviation =
+            match this with
+            | Cutting -> "cut"
+            | Impaling -> "imp"
+            | Crushing -> "cr"
+            | Piercing -> "pi"
+            | Burning -> "burn"
+            | Other -> shouldntHappen()
     type DamageSpec = Explicit of RollSpec | Swing of int | Thrust of int
+        with
+        override this.ToString() =
+            match this with
+            | Explicit r -> toString r
+            | Swing 0 -> "sw"
+            | Thrust 0 -> "thr"
+            | Swing v -> $"sw%+d{v}"
+            | Thrust v -> $"thr%+d{v}"
+
     let ticksToDice ticks bonusOrPenalty =
         // every 4 dice is +1d.
         if ticks % 4 = 3 then
@@ -119,6 +137,68 @@ module Core =
             | Swing bonusOrPenalty -> swingDamage this.ST_ bonusOrPenalty |> addWeaponMasterDamage
             | Thrust bonusOrPenalty -> thrustDamage this.ST_ bonusOrPenalty |> addWeaponMasterDamage
         member this.AlteredTimeRate_ = defaultArg this.AlteredTimeRate 0
+        override this.ToString() =
+            let names =
+                match this.pluralName with
+                | Some s when String.isntWhitespace s -> $"{this.name} [{s}]:"
+                | _ -> $"{this.name}:"
+            let labeled label = function
+                | Some v -> $"{label} {v}"
+                | _ -> ""
+            let nolabel = function Some v -> toString v | _ -> ""
+            let show label = function
+                | true -> label
+                | false -> ""
+            let leveledOverOne label = function
+                | Some 1 -> label
+                | Some n -> $"{label} {n}"
+                | _ -> ""
+            let selfControl label = function
+                | Some level -> $"{label} {toString level}" // NOT toDescription
+                | None -> ""
+            [   names
+                labeled "ST" this.ST
+                labeled "DX" this.DX
+                labeled "IQ" this.IQ
+                labeled "HT" this.HT
+                labeled "HP" this.HP
+                labeled "Speed" this.Speed
+                labeled "Dodge" this.Dodge
+                match this.Parry with
+                    | Some p when this.FencingParry -> $"Parry {p}F"
+                    | Some p -> $"Parry {p}"
+                    | None -> ""
+                labeled "Block" this.Block
+                labeled "DR" this.DR
+                labeled "Skill" this.WeaponSkill
+                nolabel this.Damage
+                match this.DamageType with
+                    | None | Some Other -> ""
+                    | Some dt -> dt.abbreviation
+                labeled "+ followup" this.FollowupDamage
+                match this.FollowupDamageType with
+                    | None | Some Other -> ""
+                    | Some dt -> if this.FollowupDamage.IsSome then dt.abbreviation else ""
+                //Berserk = None
+                //HighPainThreshold = false
+                //SupernaturalDurability = false
+                //InjuryTolerance = None
+                //AlteredTimeRate = None
+                //UseRapidStrike = false
+
+                leveledOverOne "Extra Attack" this.ExtraAttack
+                leveledOverOne "Extra Parry" this.ExtraParry
+                leveledOverOne "Altered Time Rate" this.AlteredTimeRate
+                show "Weapon Master" this.WeaponMaster
+                show "Unnatural" this.UnnaturallyFragile
+                show "Supernatural Durability" this.SupernaturalDurability
+                show "High Pain Threshold" this.HighPainThreshold
+                show "Rapid Strike" this.UseRapidStrike
+                selfControl "Berserk" this.Berserk
+                match this.InjuryTolerance with None -> "" | Some it -> it.ToString()
+
+
+                ] |> List.filter String.isntWhitespace |> String.concat " "
 
     type MonsterDatabase = {
         catalog: Map<string, Creature>
@@ -195,6 +275,7 @@ module Parser =
         | DamageOverall((damage, damageType), rest) -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType }), rest)
         | OWSStr "Rapid Strike" rest -> Some((fun c -> { c with UseRapidStrike = true }), rest)
         | OWSStr "Extra Attack" (Int (v, rest)) -> Some((fun c -> { c with ExtraAttack = Some v }), rest)
+        | OWSStr "Extra Attack" rest -> Some((fun c -> { c with ExtraAttack = Some 1 }), rest)
         | OWSStr "Extra Parry" (Int (v, rest)) -> Some((fun c -> { c with ExtraParry = Some v }), rest)
         | OWSStr "Unliving" rest -> Some((fun c -> { c with InjuryTolerance = Some Unliving }), rest)
         | OWSStr "Homogeneous" rest -> Some((fun c -> { c with InjuryTolerance = Some Homogeneous }), rest)

@@ -142,4 +142,12 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
         verify "ATR" <@ creature.Value.AlteredTimeRate = Some 1 @>
         verify "Damage" <@ creature.Value.Damage_ = RollSpec.create(1,6,+2) @>
         ]
+    testList "Round-trip" [
+        let creatures = try Domain.Defaults.database().Values |> List.ofSeq with | _ -> []
+        for creature in creatures do
+            testCase creature.name <| fun () ->
+                let txt = creature |> toString
+                let parse = parse (|Creature|_|)
+                Swensen.Unquote.Assertions.test <@ parse txt = creature @>
+        ]
     ]

@@ -196,12 +196,7 @@ module App =
             ]
     let editDamage (label:string) (stats: Creature) update =
         let value = stats.Damage
-        let render = function
-        | Explicit r -> toString r
-        | Swing 0 -> "sw"
-        | Thrust 0 -> "thr"
-        | Swing v -> $"sw%+d{v}"
-        | Thrust v -> $"thr%+d{v}"
+        let render = toString
         let txt, updateTxt = React.useState (match value with Some v -> render v | None -> $"")
         class' "editDamage" Html.div [
             Html.text label
