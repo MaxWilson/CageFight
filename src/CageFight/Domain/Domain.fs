@@ -246,7 +246,7 @@ module Parser =
         | OWSStr "Always" rest -> Some(Always, rest)
         | rest -> None
     let (|OptionalInt|_|) = pack <| function
-        | OWS (IntModifier(n, rest)) -> Some(Some n, rest)
+        | OWS (Int(n, rest)) -> Some(Some n, rest)
         | rest -> Some(None, rest)
     let (|DamageOverall|_|) = pack <| function
         | Roll(roll, OptionalDamageType(dt, rest)) -> Some((Explicit roll, dt), rest)
@@ -286,7 +286,6 @@ module Parser =
         | OWSStr "Supernatural Durability" rest -> Some((fun c -> { c with SupernaturalDurability = true }), rest)
         | OWSStr "Unnatural" rest -> Some((fun c -> { c with UnnaturallyFragile = true }), rest)
         | OWSStr "Altered Time Rate" (OptionalInt (v, rest)) -> Some((fun c -> { c with AlteredTimeRate = Some (defaultArg v 1) }), rest)
-        | OWSStr "ATR" (OptionalInt (v, rest)) -> Some((fun c -> { c with AlteredTimeRate = Some (defaultArg v 1) }), rest)
         | OWSStr "ATR" (OptionalInt (v, rest)) -> Some((fun c -> { c with AlteredTimeRate = Some (defaultArg v 1) }), rest)
         | OWSStr "Berserk" (SelfControlLevel(level, rest)) -> Some((fun c -> { c with Berserk = Some level }), rest)
         | _ -> None
