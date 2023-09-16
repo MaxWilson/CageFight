@@ -446,19 +446,15 @@ let view (model: Model) dispatch =
         Html.div [
             prop.className "homePage"
             prop.children [
+                classP' "srcLink" Html.a [
+                    prop.href "https://github.com/MaxWilson/CageFight/"
+                    prop.children [Html.img [prop.src "img/GitHub_Logo.png"]]
+                    ]
                 Html.div [
                     Html.h1 "Shining Sword Cage Fight!"
                     Html.h3 "For Dungeon Fantasy RPG and GURPS"
                     ]
                 class' "main" Html.div [
-                    classP' "commandInput" Html.form [
-                        prop.children [
-                            Html.text "Command: "
-                            Html.input [prop.placeholder "Peshkali vs. N Orcs"]
-                            Html.button [prop.text "OK"; prop.type'.submit]
-                            ]
-                        prop.onSubmit(fun e -> e.preventDefault())
-                        ]
                     class' "fightSetup" Html.div [
                         let editLink (quantity: int option) (name: string) =
                             // for aesthetic reasons, we don't want quantity to be part of the link, so it's a separate HTML element
