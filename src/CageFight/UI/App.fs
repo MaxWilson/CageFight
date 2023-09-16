@@ -170,20 +170,26 @@ let EditData<'t> (propType: IReactProperty, render: 't -> string, parser: string
 
 [<ReactComponent>]
 let EditDataNoHint<'t> (propType: IReactProperty, render: 't -> string, parser: string -> 't option) (label:string) (value: 't option, update: 't option -> unit) =
-    let txt, updateTxt = React.useState (match value with Some v -> render v | None -> "")
+    // This is kind of a hack, but we use Editing to keep track of whether we want to use the live view or the text view
+    let editing, setEditing = React.useState false
+    let liveValue = match value with Some v -> render v | None -> ""
+    let txt, updateTxt = React.useState liveValue
     labeled label <| Html.input [
-        prop.valueOrDefault txt
+        prop.valueOrDefault (if editing then txt else liveValue)
         propType
         if propType = prop.type'.number then
             prop.max 99
         prop.onChange updateTxt
+        prop.onFocus (fun _ -> setEditing true)
         prop.onBlur (fun _ ->
             let v = parser txt
             update v
+            setEditing false
             match v with
             | Some v -> updateTxt (render v)
             | None -> updateTxt "")
         ]
+
 [<ReactComponent>]
 let EditDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:string) (defaultOption: string option) (value: 't option, options, update: 't option -> unit) =
     labeled label <| Html.select [
@@ -204,14 +210,17 @@ let EditDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:
         ]
 [<ReactComponent>]
 let EditDamage (label:string) (stats: Creature) update =
-    let value = stats.Damage
+    // This is kind of a hack, but we use Editing to keep track of whether we want to use the live view or the text view
+    let editing, setEditing = React.useState false
     let render = toString
-    let txt, updateTxt = React.useState (match value with Some v -> render v | None -> $"")
+    let liveValue = match stats.Damage with Some v -> render v | None -> ""
+    let txt, updateTxt = React.useState liveValue
     class' "editDamage" Html.div [
         Html.text label
         Html.input [
-            prop.valueOrDefault txt
+            prop.valueOrDefault (if editing then txt else liveValue)
             prop.placeholder (toString stats.Damage_)
+            prop.onFocus (fun _ -> setEditing true)
             prop.onChange updateTxt
             prop.onBlur (fun _ ->
                 match Packrat.ParseArgs.Init txt with
@@ -219,11 +228,13 @@ let EditDamage (label:string) (stats: Creature) update =
                     let stats' =
                         { stats with Damage = Some dmg; DamageType = dtype |> Option.orElse stats.DamageType }
                     update stats'
+                    setEditing false
                     updateTxt (dmg |> render)
                 | _ ->
                     let stats' =
                         { stats with Damage = None }
                     update stats'
+                    setEditing false
                     updateTxt ""
                 )
             ]
