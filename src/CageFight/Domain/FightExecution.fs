@@ -123,8 +123,6 @@ let successTest target x =
     if x >= target + 10 then CritFail (x - target)
     elif x = 17 then if target >= 16 then Fail(x - 16) else CritFail (x - 16)
     elif x = 18 then CritFail (x - target)
-    elif target < 15 && x = 19 then Fail (x - target)
-    elif target < 14 && x = 20 then Fail (x - target)
     elif x > target then Fail (x - target)
     elif target >= 16 && x <= 6 then CritSuccess ((min target 6) - x)
     elif target >= 15 && x <= 5 then CritSuccess ((min target 5) - x)
