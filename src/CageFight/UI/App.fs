@@ -248,15 +248,16 @@ module App =
             editNumber "HT" stats.HT_ (stats.HT, (fun n -> { stats with HT = n } |> update))
             editNumber "DR" stats.DR_ (stats.DR, (fun n -> { stats with DR = n } |> update))
             editInjuryTolerance "Injury Tolerance" (Some "Normal") (stats.InjuryTolerance, [Unliving; Homogeneous; Diffuse], (fun v -> { stats with InjuryTolerance = v } |> update))
+            editNumber "HP" stats.HP_ (stats.HP, (fun n -> { stats with HP = n } |> update))
+            editBool "Unnaturally fragile" (stats.UnnaturallyFragile, (fun b -> { stats with UnnaturallyFragile = b } |> update))
             editBool "High Pain Threshold" (stats.HighPainThreshold, (fun b -> { stats with HighPainThreshold = b } |> update))
             editBool "Immune to shock, stun, unconsciousness" (stats.SupernaturalDurability, (fun b -> { stats with SupernaturalDurability = b } |> update))
             editBerserkLevel "Berserk" (Some "") (stats.Berserk, [Mild; Moderate; Serious; Severe; Always], (fun v -> { stats with Berserk = v } |> update))
-            editBool "Unnaturally fragile" (stats.UnnaturallyFragile, (fun b -> { stats with UnnaturallyFragile = b } |> update))
             editDecimalNumber "Speed" stats.Speed_ (stats.Speed, (fun n -> { stats with Speed = n } |> update))
-            editNumber "Dodge" stats.Dodge_ (stats.Dodge, (fun n -> { stats with Dodge = n } |> update))
             editNumberNoHint "Parry" (stats.Parry, (fun n -> { stats with Parry = n } |> update))
             editBool "Fencing Parry" (stats.FencingParry, (fun b -> { stats with FencingParry = b } |> update))
             editNumberNoHint "Block" (stats.Block, (fun n -> { stats with Block = n } |> update))
+            editNumber "Dodge" stats.Dodge_ (stats.Dodge, (fun n -> { stats with Dodge = n } |> update))
             editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
             editNumber "Weapon Skill" stats.WeaponSkill_ (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
             editDamage "Damage" stats update
@@ -264,6 +265,7 @@ module App =
             editRollSpec "Followup damage" (stats.FollowupDamage, (fun r -> { stats with FollowupDamage = r } |> update))
             if stats.FollowupDamage.IsSome then
                 editDamageType "Followup type" None (stats.FollowupDamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with FollowupDamageType = v } |> update))
+            else Html.div []
             editBool "Use Rapid Strike" (stats.UseRapidStrike, (fun b -> { stats with UseRapidStrike = b } |> update))
             editNumber "Extra Attacks" stats.ExtraAttack_ (stats.ExtraAttack, (fun n -> { stats with ExtraAttack = n } |> update))
             editNumber "Extra Parries" stats.ExtraParry_ (stats.ExtraParry, (fun n -> { stats with ExtraParry = n } |> update))
