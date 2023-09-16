@@ -91,7 +91,7 @@ module CombatEvents =
                     injuryTaken = c.injuryTaken + amount
                     shockPenalty =
                         if c.stats.SupernaturalDurability || c.stats.HighPainThreshold || (mods' |> List.contains Berserk) then 0
-                        else (c.shockPenalty - amount) |> max -4
+                        else (c.shockPenalty - (amount / (max 1 (c.stats.HP_ / 10)))) |> max -4
                     statusMods = if goingBerserk then mods' |> List.filter ((<>) Stunned) else mods'
                     })
         match msg with
