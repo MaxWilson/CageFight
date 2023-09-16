@@ -2,7 +2,7 @@ module Domain.FightExecution
 open Domain
 open Domain.Random
 
-type Status = OK | Stunned | Prone | Unconscious | Dead
+type Status = OK | Stunned | Prone | Unconscious | Dead | Berserk
 type CombatantId = int * string
 type Combatant = {
     personalName: string
@@ -80,12 +80,13 @@ module CombatEvents =
                     })
         let takeDamage (id: CombatantId) amount conditions =
             updateCombatant id (fun c ->
+                let mods' = (c.statusMods @ conditions) |> List.distinct
                 { c with
                     injuryTaken = c.injuryTaken + amount
                     shockPenalty =
-                        if c.stats.SupernaturalDurability && c.stats.HighPainThreshold then 0
+                        if c.stats.SupernaturalDurability || c.stats.HighPainThreshold || (mods' |> List.contains Berserk) then 0
                         else (c.shockPenalty - amount) |> max -4
-                    statusMods = List.distinct (c.statusMods @ conditions)
+                    statusMods = mods'
                     })
         match msg with
         | Hit (ids, defense, injury, statusImpact, rollDetails) ->
@@ -317,6 +318,8 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                                 recordMsg $"Damage {attacker.stats.Damage_} ({dmg} {defaultArg attacker.stats.DamageType Other}) - DR {victim.stats.DR_} = {injury} injury"
                                                 injury
                                         let mutable newConditions = []
+                                        if (float injury > float victim.stats.HP_ / 4. && attacker.statusMods |> List.contains Berserk |> not) then
+                                            ()
                                         let hp' = victim.CurrentHP_ - injury
                                         // -5 x max HP is auto-death
                                         let autodeathThreshold = victim.stats.HP_ * (if victim.stats.UnnaturallyFragile then -1 else -5)

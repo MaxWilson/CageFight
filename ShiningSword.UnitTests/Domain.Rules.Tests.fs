@@ -122,4 +122,12 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ getThresholds 10 -9 = [-10; -20; -30; -40] @>
         verify <@ getThresholds 10 -10 = [-20; -30; -40] @>
         verify <@ getThresholds 14 -10 = [-14; -28; -42; -56] @>
+    testCase "Check for auto-berserk" <| fun () ->
+        let parse input =
+            match Packrat.ParseArgs.Init input with
+            | Domain.Parser.Creature (v, Packrat.End) -> v
+            | v -> shouldntHappen()
+        let db = [parse "Minotaur: ST 23 Berserk Auto"] |> List.map (fun c -> c.name, c) |> Map.ofList
+        let c = createCombat db [(1, "Minotaur")] [(1, "Minotaur")]
+        verify <@ c.combatants.Values |> List.ofSeq |> List.every (fun c -> c.statusMods |> List.contains Berserk ) @>
     ]
