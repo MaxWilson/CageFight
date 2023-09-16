@@ -297,10 +297,10 @@ module App =
                                     Html.td c.personalName
                                     Html.td c.CurrentHP_
                                     Html.td [
-                                        if c.statusMods |> List.contains Dead then
+                                        if c.is Dead then
                                             prop.className "statusDead"
                                             prop.text "Dead"
-                                        elif c.statusMods |> List.contains Unconscious then
+                                        elif c.is Unconscious then
                                             prop.className "statusDead"
                                             prop.text "Unconscious"
                                         else

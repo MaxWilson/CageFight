@@ -129,5 +129,5 @@ let Tests = testLabel "Unit" <| testList "Rules" [
             | v -> shouldntHappen()
         let db = [parse "Minotaur: ST 23 Berserk Auto"] |> List.map (fun c -> c.name, c) |> Map.ofList
         let c = createCombat db [(1, "Minotaur")] [(1, "Minotaur")]
-        verify <@ c.combatants.Values |> List.ofSeq |> List.every (fun c -> c.statusMods |> List.contains Berserk ) @>
+        verify <@ c.combatants.Values |> List.ofSeq |> List.every (fun c -> c.is Berserk) @>
     ]

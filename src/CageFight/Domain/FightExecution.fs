@@ -31,6 +31,10 @@ type Combatant = {
             blockUsed = false
             parriesUsed = 0
             }
+    member this.is (status: Status) = this.statusMods |> List.exists ((=) status)
+    member this.isAny (statuses: Status list) = this.statusMods |> List.includes statuses
+    member this.isnt (status: Status) = this.is status |> not
+    member this.isnt (statuses: Status list) = this.isAny statuses |> not
 type Combat = {
     combatants: Map<CombatantId, Combatant>
     }
@@ -137,7 +141,7 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
     let potentialTargets =
         combat.combatants.Values
         |> Seq.filter (fun c -> c.team <> attacker.team)
-        |> Seq.filter (fun c -> c.statusMods |> List.forall (fun s -> not (s = Dead || s = Unconscious)))
+        |> Seq.filter (fun c -> c.isAny[Dead;Unconscious] |> not)
         // We don't want to overkill damage, so we put targets that might fall unconscious by themselves
         // fairly low in priority, although we also want to damage vulnerable targets while they're vulnerable
         // so we put stunned and prone targets at high priority.
@@ -147,9 +151,9 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
         // then targets at or below 0 HP
         // then anyone still alive (ordered by statblock name and number because why not, and it makes readouts more predictable)
         |> Seq.sortBy(fun c ->
-            ((c.statusMods |> List.contains Stunned)
+            ((c.is Stunned)
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
-            ((c.statusMods |> List.contains Prone)
+            ((c.is Prone)
                 && c.CurrentHP_ > -c.stats.HP_) |> not,
             betweenInclusive (0, (c.stats.HP_ + 1) / 3) c.CurrentHP_ |> not,
             c.CurrentHP_ <= 0 && not c.stats.SupernaturalDurability,
@@ -161,7 +165,7 @@ let tryFindTarget (combat: Combat) (attacker: Combatant) =
 
 let chooseDefense (attacker: CombatantId) (victim: Combatant) =
     let canRetreat =
-        (not <| List.includes [Dead; Unconscious; Stunned] victim.statusMods)
+        (not <| victim.isAny [Dead; Unconscious; Stunned] )
         && (
         match victim.retreatUsed with
         | Some id when id = attacker -> true
@@ -194,8 +198,8 @@ let chooseDefense (attacker: CombatantId) (victim: Combatant) =
             dodge, { defense = Dodge; retreatFrom = retreat }
     let target =
         target
-        + (if victim.statusMods |> List.contains Stunned then -4 else 0)
-        + (if victim.statusMods |> List.contains Prone then -3 else 0)
+        + (if victim.is Stunned then -4 else 0)
+        + (if victim.is Prone then -3 else 0)
     target, defense
 
 let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
@@ -243,22 +247,24 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
             attempt "Stay conscious" (self.stats.HT_ + penalty + (if isBerserk then +4 else 0)) |> not
         let mutable doneEarly = false
         let attacker = cqrs.State.combatants[c]
-        if attacker.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
-            if attacker.statusMods |> List.exists ((=) Stunned) then
+        if attacker.isnt [Dead; Unconscious] then
+            if attacker.is Stunned then
                 if attempt "Recover from stun" attacker.stats.HT_ then
                     Unstun(attacker.Id, msg)
                 else
                     Info(attacker.Id, "does nothing", msg)
                 |> cqrs.Execute
-            elif attacker.CurrentHP_ <= 0 && (not attacker.stats.SupernaturalDurability) && checkGoesUnconscious (attacker, attacker.statusMods |> List.contains Berserk) 0 then
+            elif attacker.CurrentHP_ <= 0 && (not attacker.stats.SupernaturalDurability) && checkGoesUnconscious (attacker, attacker.is Berserk) 0 then
                 FallUnconscious(attacker.Id, msg)
                 |> cqrs.Execute
-            elif attacker.statusMods |> List.exists ((=) Prone) then
+            elif attacker.is Prone then
                 StandUp(attacker.Id, msg)
                 |> cqrs.Execute
             else
                 for m in 1..(1 + attacker.stats.AlteredTimeRate_) do
-                    let totalAttacks, rapidStrikes = (if attacker.stats.UseRapidStrike then 2 + attacker.stats.ExtraAttack_, 2 else 1 + attacker.stats.ExtraAttack_, 0)
+                    let totalAttacks, rapidStrikes =
+                        (if attacker.stats.UseRapidStrike then 2 + attacker.stats.ExtraAttack_, 2 else 1 + attacker.stats.ExtraAttack_, 0)
+                    let totalAttacks = if attacker.is Berserk then totalAttacks + 1 else totalAttacks
                     for n in 1..totalAttacks do
                         if (not doneEarly) then
                             match attacker |> tryFindTarget cqrs.State with
@@ -285,7 +291,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                         (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
                                         + (if defense.targetRetreated then " and retreat" else "")
                                     let critSuccess = match success with CritSuccess _ -> true | _ -> false
-                                    if not (critSuccess || victim.statusMods |> List.contains Berserk) && attempt defenseLabel (defenseTarget - defensePenalty) then
+                                    if not (critSuccess || victim.is Berserk) && attempt defenseLabel (defenseTarget - defensePenalty) then
                                         SuccessfulDefense({ attacker = attacker.Id; target = victim.Id }, defense, msg)
                                     else
                                         let defense =
@@ -318,9 +324,9 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                                 recordMsg $"Damage {attacker.stats.Damage_} ({dmg} {defaultArg attacker.stats.DamageType Other}) - DR {victim.stats.DR_} = {injury} injury"
                                                 injury
                                         let mutable newConditions = []
-                                        let mutable berserk = victim.statusMods |> List.contains Berserk
+                                        let mutable berserk = victim.is Berserk
                                         match victim.stats.Berserk with
-                                        | Some berserkLevel when (float injury > float victim.stats.HP_ / 4. && (victim.statusMods |> List.contains Berserk |> not)) ->
+                                        | Some berserkLevel when (float injury > float victim.stats.HP_ / 4. && victim.isnt Berserk) ->
                                             let target =
                                                 match berserkLevel with Mild -> 15 | Moderate -> 12 | Serious -> 9 | Severe -> 6 | Always -> 0
                                             // we deliberately don't use attempt here because we don't want to clutter the log with self-control rolls
@@ -360,7 +366,7 @@ let fight (cqrs: CQRS.CQRS<_,Combat>) =
     let rec loop counter =
         let survivingTeams =
             let everyone = cqrs.State.combatants.Values |> List.ofSeq
-            everyone |> List.choose (fun c -> if not (c.statusMods |> List.exists (fun m -> m = Dead || m = Unconscious)) then Some c.team else None)
+            everyone |> List.choose (fun c -> if c.isnt [Dead; Unconscious] then Some c.team else None)
                      |> List.distinct
         if survivingTeams.Length < 2 || counter > 100 then
             // it's possible to have a tie or a mutual kill
@@ -412,15 +418,14 @@ let calibrate db team1 (enemyType, minbound, maxbound, defeatCriteria) =
                     fun (cqrs, v) ->
                         // in this case, TeamA is very casualty-averse. Defeat is taking even one casualty (dead or unconscious).
                         if cqrs.State.combatants.Values |> Seq.exists (fun c ->
-                            c.team = 1 && c.statusMods |> List.exists (
-                                function Dead | Unconscious -> true | _ -> false)) then
+                            c.team = 1 && c.isAny[Dead; Unconscious]) then
                             0
                         else 1
                 | HalfCasualties ->
                     fun (cqrs, v) ->
                         // in this case, TeamA is somewhat casualty-averse. Defeat is a pyrrhic victory where at least half the team dies.
                         let friendlies = cqrs.State.combatants.Values |> Seq.filter (fun c -> c.team = 1)
-                        let deadFriendlies = friendlies |> Seq.filter (fun c -> c.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false))
+                        let deadFriendlies = friendlies |> Seq.filter (fun c -> c.isAny[Dead; Unconscious])
                         if deadFriendlies |> Seq.length >= ((friendlies |> Seq.length) / 2) then
                             0
                         else 1
