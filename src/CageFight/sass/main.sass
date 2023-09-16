@@ -123,6 +123,8 @@ body
     grid-auto-columns: repeat(auto-fit, minmax(100px, 1fr))
     grid-template-columns: auto 1fr
     user-select: None
+    .error
+        color: red
     input
         max-width: 8em
     input[type="number"]
@@ -131,6 +133,9 @@ body
         position: relative
         top: 2px
         left: 5px
+    .textview
+        grid-column: 1 / span 2
+        max-width: 100%
     .editDamage input
         max-width: 80px
     button, input, select

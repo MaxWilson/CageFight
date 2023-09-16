@@ -310,7 +310,7 @@ module Defaults =
         [
             let parse (input: string) =
                 match ParseArgs.Init input with
-                | Parser.Creature(c, End) -> c
+                | Parser.Creature(c, OWS End) -> c
                 | _ -> shouldntHappen input
             parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 DR 4 Skill 18 sw+1 cut Extra Attack 5 Extra Parry 5 Parry 13 Dodge 10 Supernatural Durability"
             parse "Orc: ST 12 DX 11 IQ 9 HT 11 DR 2 HP 14 Dodge 7 Parry 9 Block 9 Skill 13 sw+1 cut"
