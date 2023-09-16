@@ -101,9 +101,45 @@ let AcceptanceTests() = (testLabel "Acceptance") <| testList "Parse" [
     testList "Stone Golem" [
         let verify, pverify = makeVerify()
         let creature = lazy(
-            parse (|Creature|_|) "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
+            parse (|Creature|_|) "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 HPT Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
             )
         verify "UnnaturallyFragile" <@ creature.Value.UnnaturallyFragile = true @>
         verify "Damage" <@ creature.Value.Damage_ = RollSpec.create(3,6,+6) @>
+        verify "HPT" <@ creature.Value.HighPainThreshold = true @>
+        ]
+    testList "Inigo Montoya" [
+        let verify, pverify = makeVerify()
+        let creature = lazy(
+                parse (|Creature|_|) "Inigo Montoya: ST 13 DX 16 IQ 11 HT 12 Speed 8.5 Dodge 12 Parry 17F DR 1 Weapon Master Skill 22 thr+2 imp Extra Attack 1 Rapid Strike"
+            )
+        verify "Rapid Strike" <@ creature.Value.UseRapidStrike = true @>
+        verify "Weapon Master" <@ creature.Value.WeaponMaster = true @>
+        verify "Fencing parry" <@ (creature.Value.Parry.Value, creature.Value.FencingParry) = (17, true) @>
+        ]
+    testList "Ogre" [
+        let verify, pverify = makeVerify()
+        let creature = lazy(
+            parse (|Creature|_|) "Ogre: ST 20 DX 11 IQ 7 HT 13 High Pain Threshold Skill 16 3d+7 cr Parry 11 DR 3"
+            )
+        verify "Name" <@ creature.Value.name = "Ogre" @>
+        verify "ST" <@ creature.Value.ST.Value = 20 @>
+        verify "DX" <@ creature.Value.DX.Value = 11 @>
+        verify "HPT" <@ creature.Value.HighPainThreshold = true @>
+        ]
+    testList "Cave Bear" [
+        let verify, pverify = makeVerify()
+        let creature = lazy(
+                parse (|Creature|_|) "Cave Bear: ST 23 DX 11 IQ 4 HT 13 DR 2 Parry 9 Skill 13 2d thr+1 cut Berserk 9"
+            )
+        verify "Berserk" <@ creature.Value.Berserk = Some Serious @>
+        verify "Damage" <@ (creature.Value.Damage_, creature.Value.DamageType) = (RollSpec.create(2,6,+2), Some Cutting) @>
+        ]
+    testList "Watcher" [
+        let verify, pverify = makeVerify()
+        let creature = lazy(
+                parse (|Creature|_|) "Watcher: ST 12 DX 18 HT 12 Speed 10 Dodge 14 Parry 13 Skill 18 sw cut Extra Parry 3 Extra Attack 3 Altered Time Rate"
+            )
+        verify "ATR" <@ creature.Value.AlteredTimeRate = Some 1 @>
+        verify "Damage" <@ creature.Value.Damage_ = RollSpec.create(1,6,+2) @>
         ]
     ]

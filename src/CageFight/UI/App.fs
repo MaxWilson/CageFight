@@ -187,8 +187,8 @@ module App =
             | _ -> ()
             prop.children [
                 match defaultOption with
-                | Some v -> Html.option [prop.text v; prop.value v]
-                | None -> ()
+                | Some v when not (options |> List.exists (fun o -> render o = v)) -> Html.option [prop.text v; prop.value v]
+                | _ -> ()
                 for option in options do
                     Html.option [prop.text (render option); prop.value (render option)]
                 ]
@@ -237,8 +237,7 @@ module App =
         let editRollSpec = editDataNoHint<RollSpec>(prop.type'.text, toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Random.Parser.Roll(r, Packrat.End) -> Some r | _ -> None))
         let editDamageType = editDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
         let editInjuryTolerance = editDropdown(toString, (function "Unliving" -> Some Unliving | "Homogeneous" -> Some Homogeneous  | "Diffuse" -> Some Diffuse | _ -> None))
-        let editBool label (value: bool, update) =
-            checkbox Html.div label (value, update)
+        let editBool label (value: bool, update) = checkbox Html.div label (value, update)
         class' "editView" Html.div [
             editString "Name" "" (Some stats.name, (fun txt -> { stats with name = defaultArg txt "" } |> update))
             editString "Pluralized" (stats.name + "s") (stats.pluralName, (fun txt -> { stats with pluralName = txt } |> update))
@@ -248,6 +247,7 @@ module App =
             editNumber "HT" stats.HT_ (stats.HT, (fun n -> { stats with HT = n } |> update))
             editNumber "DR" stats.DR_ (stats.DR, (fun n -> { stats with DR = n } |> update))
             editInjuryTolerance "Injury Tolerance" (Some "Normal") (stats.InjuryTolerance, [Unliving; Homogeneous; Diffuse], (fun v -> { stats with InjuryTolerance = v } |> update))
+            editBool "High Pain Threshold" (stats.HighPainThreshold, (fun b -> { stats with HighPainThreshold = b } |> update))
             editBool "Immune to shock, stun, unconsciousness" (stats.SupernaturalDurability, (fun b -> { stats with SupernaturalDurability = b } |> update))
             editNumber "HP" stats.HP_ (stats.HP, (fun n -> { stats with HP = n } |> update))
             editBool "Unnaturally fragile" (stats.UnnaturallyFragile, (fun b -> { stats with UnnaturallyFragile = b } |> update))
@@ -259,15 +259,17 @@ module App =
             editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
             editNumber "Weapon Skill" stats.WeaponSkill_ (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
             editDamage "Damage" stats update
-            editDamageType "Damage type" None (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with DamageType = v } |> update))
+            editDamageType "Damage type" (Some "Other") (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with DamageType = v } |> update))
             editRollSpec "Followup damage" (stats.FollowupDamage, (fun r -> { stats with FollowupDamage = r } |> update))
             if stats.FollowupDamage.IsSome then
                 editDamageType "Followup type" None (stats.FollowupDamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with FollowupDamageType = v } |> update))
+            editBool "Use Rapid Strike" (stats.UseRapidStrike, (fun b -> { stats with UseRapidStrike = b } |> update))
             editNumber "Extra Attacks" stats.ExtraAttack_ (stats.ExtraAttack, (fun n -> { stats with ExtraAttack = n } |> update))
             editNumber "Extra Parries" stats.ExtraParry_ (stats.ExtraParry, (fun n -> { stats with ExtraParry = n } |> update))
+            editNumber "Altered Time Rate" stats.AlteredTimeRate_ (stats.AlteredTimeRate, (fun n -> { stats with AlteredTimeRate = n } |> update))
 
             Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
-            Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home))]
+            Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home)); prop.disabled (stats.name |> System.String.IsNullOrWhiteSpace)]
             ]
 
     [<ReactComponent>]

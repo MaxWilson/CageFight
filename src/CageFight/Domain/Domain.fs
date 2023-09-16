@@ -25,6 +25,7 @@ module Core =
         elif st <= 70 then ticksToDice ((st-6+1) / 2) bonusOrPenalty
         else ticksToDice ((st+10+1)*4/10) bonusOrPenalty
     type InjuryTolerance = Unliving | Homogeneous | Diffuse
+    type SelfControlLevel = Mild | Moderate | Serious | Severe | Always
     type Creature = {
         name: string
         pluralName: string prop
@@ -48,8 +49,12 @@ module Core =
         FollowupDamage: RollSpec prop
         FollowupDamageType: DamageType prop
         UnnaturallyFragile: bool
+        Berserk: SelfControlLevel prop
+        HighPainThreshold: bool
         SupernaturalDurability: bool
-        InjuryTolerance: InjuryTolerance option
+        InjuryTolerance: InjuryTolerance prop
+        AlteredTimeRate: int prop
+        UseRapidStrike: bool
         }
         with
         static member create (name: string, ?pluralName) =
@@ -75,8 +80,12 @@ module Core =
               ExtraAttack = None
               ExtraParry = None
               UnnaturallyFragile = false
+              Berserk = None
+              HighPainThreshold = false
               SupernaturalDurability = false
               InjuryTolerance = None
+              AlteredTimeRate = None
+              UseRapidStrike = false
               }
         // "_" means "defaulted" in the sense that it's the value that will be used if the property is not set.
         member this.PluralName_ = defaultArg this.pluralName (this.name + "s")
@@ -101,6 +110,7 @@ module Core =
             | Explicit roll -> roll
             | Swing bonusOrPenalty -> swingDamage this.ST_ bonusOrPenalty |> addWeaponMasterDamage
             | Thrust bonusOrPenalty -> thrustDamage this.ST_ bonusOrPenalty |> addWeaponMasterDamage
+        member this.AlteredTimeRate_ = defaultArg this.AlteredTimeRate 0
 
     type MonsterDatabase = {
         catalog: Map<string, Creature>
@@ -134,6 +144,21 @@ module Parser =
     let (|OptionalIntMod|_|) = pack <| function
         | OWS (IntModifier(bonusOrPenalty, rest)) -> Some(bonusOrPenalty, rest)
         | rest -> Some(0, rest)
+    let (|SelfControlLevel|_|) = pack <| function
+        | OWSStr "15" rest -> Some(Mild, rest)
+        | OWSStr "Mild" rest -> Some(Mild, rest)
+        | OWSStr "12" rest -> Some(Moderate, rest)
+        | OWSStr "Moderate" rest -> Some(Moderate, rest)
+        | OWSStr "9" rest -> Some(Serious, rest)
+        | OWSStr "Serious" rest -> Some(Serious, rest)
+        | OWSStr "6" rest -> Some(Severe, rest)
+        | OWSStr "Severe" rest -> Some(Severe, rest)
+        | OWSStr "Auto" rest -> Some(Always, rest)
+        | OWSStr "Always" rest -> Some(Always, rest)
+        | rest -> None
+    let (|OptionalInt|_|) = pack <| function
+        | OWS (IntModifier(n, rest)) -> Some(Some n, rest)
+        | rest -> Some(None, rest)
     let (|DamageOverall|_|) = pack <| function
         | Roll(roll, OptionalDamageType(dt, rest)) -> Some((Explicit roll, dt), rest)
         | OWSStr "swing" (OptionalIntMod(bonusOrPenalty, OptionalDamageType(dt, rest))) -> Some((Swing bonusOrPenalty, dt), rest)
@@ -160,13 +185,20 @@ module Parser =
         | DamageOverall((damage, damageType), OWSStr "+" (OWSStr "followup" (OWS (Roll((followupDamage, OptionalDamageType(followupDamageType, rest)))))))
             -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType; FollowupDamage = Some followupDamage; FollowupDamageType = followupDamageType }), rest)
         | DamageOverall((damage, damageType), rest) -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType }), rest)
+        | OWSStr "Rapid Strike" rest -> Some((fun c -> { c with UseRapidStrike = true }), rest)
         | OWSStr "Extra Attack" (Int (v, rest)) -> Some((fun c -> { c with ExtraAttack = Some v }), rest)
         | OWSStr "Extra Parry" (Int (v, rest)) -> Some((fun c -> { c with ExtraParry = Some v }), rest)
         | OWSStr "Unliving" rest -> Some((fun c -> { c with InjuryTolerance = Some Unliving }), rest)
         | OWSStr "Homogeneous" rest -> Some((fun c -> { c with InjuryTolerance = Some Homogeneous }), rest)
         | OWSStr "Diffuse" rest -> Some((fun c -> { c with InjuryTolerance = Some Diffuse }), rest)
+        | OWSStr "High Pain Threshold" rest -> Some((fun c -> { c with HighPainThreshold = true }), rest)
+        | OWSStr "HPT" rest -> Some((fun c -> { c with HighPainThreshold = true }), rest)
         | OWSStr "Supernatural Durability" rest -> Some((fun c -> { c with SupernaturalDurability = true }), rest)
         | OWSStr "Unnatural" rest -> Some((fun c -> { c with UnnaturallyFragile = true }), rest)
+        | OWSStr "Altered Time Rate" (OptionalInt (v, rest)) -> Some((fun c -> { c with AlteredTimeRate = Some (defaultArg v 1) }), rest)
+        | OWSStr "ATR" (OptionalInt (v, rest)) -> Some((fun c -> { c with AlteredTimeRate = Some (defaultArg v 1) }), rest)
+        | OWSStr "ATR" (OptionalInt (v, rest)) -> Some((fun c -> { c with AlteredTimeRate = Some (defaultArg v 1) }), rest)
+        | OWSStr "Berserk" (SelfControlLevel(level, rest)) -> Some((fun c -> { c with Berserk = Some level }), rest)
         | _ -> None
     let rec (|CreatureProperties|_|) = pack <| function
         | CreatureProperties(fprops, CreatureProperty(fprop, rest)) -> Some(fprops >> fprop, rest)
@@ -193,12 +225,14 @@ module Defaults =
                 | _ -> shouldntHappen input
             parse "Peshkali [Peshkalir]: ST 20 DX 12 HT 12 DR 4 Skill 18 sw+1 cut Extra Attack 5 Extra Parry 5 Parry 13 Dodge 10 Supernatural Durability"
             parse "Orc: ST 12 DX 11 IQ 9 HT 11 DR 2 HP 14 Dodge 7 Parry 9 Block 9 Skill 13 sw+1 cut"
-            parse "Ogre: ST 20 DX 11 IQ 7 HT 13 Skill 16 3d+7 cr Parry 11 DR 3"
+            parse "Ogre: ST 20 DX 11 IQ 7 HT 13 High Pain Threshold Skill 16 3d+7 cr Parry 11 DR 3"
             parse "Slugbeast: ST 16 IQ 2 Skill 12 1d+2 Homogeneous"
             parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp DR 2 Speed 8 Parry 10 Block 10 Unliving Unnatural"
-            parse "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
+            parse "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 HPT Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
             parse "Rock Mite: ST 12 HT 13 Speed 5.00 DR 5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
-            parse "Inigo Montoya: ST 13 DX 16 IQ 11 HT 12 Speed 8.5 Dodge 12 Parry 17F DR 1 Weapon Master Skill 22 thr+2 imp Extra Attack 1"
+            parse "Inigo Montoya: ST 13 DX 16 IQ 11 HT 12 Speed 8.5 Dodge 12 Parry 17F DR 1 Weapon Master Skill 22 thr+2 imp Extra Attack 1 Rapid Strike"
+            parse "Cave Bear: ST 23 DX 11 IQ 4 HT 13 DR 2 Parry 9 Skill 13 2d thr+1 cut Berserk 9"
+            parse "Watcher: ST 12 DX 18 HT 12 Speed 10 Dodge 14 Parry 13 Skill 18 sw cut Extra Parry 3 Extra Attack 3 Altered Time Rate"
             ]
         |> List.map(fun c -> c.name, c)
         |> Map.ofList
