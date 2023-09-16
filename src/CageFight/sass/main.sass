@@ -121,7 +121,12 @@ body
             text-align: center
 
 .editView
+    display: grid
+    grid-auto-columns: repeat(auto-fit, minmax(100px, 1fr))
+    grid-template-columns: auto 1fr
     user-select: None
+    input
+        max-width: 8em
     input[type="number"]
         max-width: 4em
     input[type="checkbox"]
@@ -133,6 +138,9 @@ body
     button, input, select
         margin-top: 5px
         margin-right: 10px
+    .buttons
+        margin-top: 20px
+        grid-column: 1
     input, select
         margin-left: 5px
     button

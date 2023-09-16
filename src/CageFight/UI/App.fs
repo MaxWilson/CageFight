@@ -268,9 +268,10 @@ module App =
             editNumber "Extra Attacks" stats.ExtraAttack_ (stats.ExtraAttack, (fun n -> { stats with ExtraAttack = n } |> update))
             editNumber "Extra Parries" stats.ExtraParry_ (stats.ExtraParry, (fun n -> { stats with ExtraParry = n } |> update))
             editNumber "Altered Time Rate" stats.AlteredTimeRate_ (stats.AlteredTimeRate, (fun n -> { stats with AlteredTimeRate = n } |> update))
-
-            Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
-            Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home)); prop.disabled (stats.name |> System.String.IsNullOrWhiteSpace)]
+            class' "buttons" Html.div [
+                Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
+                Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home)); prop.disabled (stats.name |> System.String.IsNullOrWhiteSpace)]
+                ]
             ]
 
     [<ReactComponent>]
