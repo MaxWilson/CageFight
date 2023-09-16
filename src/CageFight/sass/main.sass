@@ -22,19 +22,19 @@ img, picture, svg, video
 body
     padding: 5px
 
-button
-    user-select: none
 
 .main
     .fightSetup, .fightLog, .statistics, .commandInput
         margin-top: 5px
+    .fightSetup
+        user-select: none
     .fightSetup, .fightLog
         border: thin solid black
         padding: 3px
         button, input
-           margin-right: 3px
-           margin-top: 3px
-           min-width: 1em
+            margin-right: 7px
+            margin-top: 3px
+            min-width: 1.5em
         .editLink
             margin-left: 3px
             margin-right: 3px
@@ -49,10 +49,12 @@ button
         .clearButton
            float: right
     .fightSetup
-        display: flex
-        direction: flex-row
-        div
-            flex-grow: 1
+        display: grid
+        grid-template-columns: 1fr auto 1fr
+        :nth-child(0)
+            grid-column: 1
+        :nth-child(2)
+            grid-column: 3
     .calibrationRange
         input
             padding: 2px

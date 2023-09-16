@@ -138,7 +138,7 @@ module App =
     let checkbox ctor (label: string) (isChecked, update) =
         ctor [
             let chkid = $"checkbox_{label}"
-            Html.label [prop.text label; prop.for' chkid]
+            Html.label [prop.text label; prop.htmlFor chkid]
             Html.input [prop.type'.checkbox; prop.id chkid; prop.isChecked isChecked; prop.readOnly true; prop.onCheckedChange update]
             ]
     let labeled (label: string) (inner: ReactElement) =
