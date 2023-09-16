@@ -140,6 +140,7 @@ module Core =
         override this.ToString() =
             let names =
                 match this.pluralName with
+                | _ when this.name |> System.String.IsNullOrWhiteSpace -> ""
                 | Some s when String.isntWhitespace s -> $"{this.name} [{s}]:"
                 | _ -> $"{this.name}:"
             let labeled label = function

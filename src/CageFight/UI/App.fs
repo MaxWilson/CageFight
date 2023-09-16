@@ -145,23 +145,31 @@ let labeled (label: string) (inner: ReactElement) =
         Html.text label
         inner
         ]
-let editData<'t> (propType: IReactProperty, render: 't -> string, parser: string -> 't option) (label:string) (hint: 't) (value: 't option, update: 't option -> unit) =
-    let txt, updateTxt = React.useState (match value with Some v -> render v | None -> "")
+[<ReactComponent>]
+let EditData<'t> (propType: IReactProperty, render: 't -> string, parser: string -> 't option) (label:string) (hint: 't) (value: 't option, update: 't option -> unit) =
+    // This is kind of a hack, but we use Editing to keep track of whether we want to use the live view or the text view
+    let editing, setEditing = React.useState false
+    let liveValue = match value with Some v -> render v | None -> ""
+    let txt, updateTxt = React.useState liveValue
     labeled label <| Html.input [
-        prop.valueOrDefault txt
+        prop.valueOrDefault (if editing then txt else liveValue)
         prop.placeholder (render hint)
         propType
         if propType = prop.type'.number then
             prop.max 99
         prop.onChange updateTxt
+        prop.onFocus (fun _ -> setEditing true)
         prop.onBlur (fun _ ->
             let v = parser txt
             update v
+            setEditing false
             match v with
             | Some v -> updateTxt (render v)
             | None -> updateTxt "")
         ]
-let editDataNoHint<'t> (propType: IReactProperty, render: 't -> string, parser: string -> 't option) (label:string) (value: 't option, update: 't option -> unit) =
+
+[<ReactComponent>]
+let EditDataNoHint<'t> (propType: IReactProperty, render: 't -> string, parser: string -> 't option) (label:string) (value: 't option, update: 't option -> unit) =
     let txt, updateTxt = React.useState (match value with Some v -> render v | None -> "")
     labeled label <| Html.input [
         prop.valueOrDefault txt
@@ -176,7 +184,8 @@ let editDataNoHint<'t> (propType: IReactProperty, render: 't -> string, parser: 
             | Some v -> updateTxt (render v)
             | None -> updateTxt "")
         ]
-let editDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:string) (defaultOption: string option) (value: 't option, options, update: 't option -> unit) =
+[<ReactComponent>]
+let EditDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:string) (defaultOption: string option) (value: 't option, options, update: 't option -> unit) =
     labeled label <| Html.select [
         match value, defaultOption with
         | Some value, _ ->
@@ -193,7 +202,8 @@ let editDropdown<'t> (render: 't -> string, parser: string -> 't option) (label:
             ]
         prop.onChange (parser >> update)
         ]
-let editDamage (label:string) (stats: Creature) update =
+[<ReactComponent>]
+let EditDamage (label:string) (stats: Creature) update =
     let value = stats.Damage
     let render = toString
     let txt, updateTxt = React.useState (match value with Some v -> render v | None -> $"")
@@ -230,14 +240,14 @@ let [<ReactComponent>] EditView (name: string) (db: MonsterDatabase) dispatch =
         setTextView (stats.ToString())
         setStats stats
 
-    let editString = editData<string>(prop.type'.text, toString, (fun (txt: string) -> if String.isntWhitespace txt then Some txt else None))
-    let editNumber = editData(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
-    let editNumberNoHint = editDataNoHint(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
-    let editDecimalNumber = editData(prop.type'.number, (fun v -> $"%.2f{v}"), (fun (input: string) -> match System.Double.TryParse input with true, n -> Some n | _ -> None))
-    let editRollSpec = editDataNoHint<RollSpec>(prop.type'.text, toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Random.Parser.Roll(r, Packrat.End) -> Some r | _ -> None))
-    let editDamageType = editDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
-    let editInjuryTolerance = editDropdown(toString, (function "Unliving" -> Some Unliving | "Homogeneous" -> Some Homogeneous  | "Diffuse" -> Some Diffuse | _ -> None))
-    let editBerserkLevel = editDropdown(SelfControlLevel.toDescription, (fun (input: string) -> [Mild; Moderate; Serious; Severe; Always] |> List.tryFind (fun lvl -> SelfControlLevel.toDescription lvl = input)))
+    let editString = EditData<string>(prop.type'.text, toString, (fun (txt: string) -> if String.isntWhitespace txt then Some txt else None))
+    let editNumber = EditData(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
+    let editNumberNoHint = EditDataNoHint(prop.type'.number, toString, (fun (input: string) -> match System.Int32.TryParse input with true, n -> Some n | _ -> None))
+    let editDecimalNumber = EditData(prop.type'.number, (fun v -> $"%.2f{v}"), (fun (input: string) -> match System.Double.TryParse input with true, n -> Some n | _ -> None))
+    let editRollSpec = EditDataNoHint<RollSpec>(prop.type'.text, toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Random.Parser.Roll(r, Packrat.End) -> Some r | _ -> None))
+    let editDamageType = EditDropdown(toString, (fun (input: string) -> match Packrat.ParseArgs.Init input with Domain.Parser.DamageType (r, Packrat.End) -> Some r | _ -> None))
+    let editInjuryTolerance = EditDropdown(toString, (function "Unliving" -> Some Unliving | "Homogeneous" -> Some Homogeneous  | "Diffuse" -> Some Diffuse | _ -> None))
+    let editBerserkLevel = EditDropdown(SelfControlLevel.toDescription, (fun (input: string) -> [Mild; Moderate; Serious; Severe; Always] |> List.tryFind (fun lvl -> SelfControlLevel.toDescription lvl = input)))
     let editBool label (value: bool, update) = checkbox Html.div label (value, update)
     class' "editView" Html.div [
         classP' ("textview" + if textError then " error" else "") Html.input [
@@ -273,7 +283,7 @@ let [<ReactComponent>] EditView (name: string) (db: MonsterDatabase) dispatch =
         editNumberNoHint "Block" (stats.Block, (fun n -> { stats with Block = n } |> update))
         editNumber "Weapon Skill" stats.WeaponSkill_ (stats.WeaponSkill, (fun n -> { stats with WeaponSkill = n } |> update))
         editBool "Weapon Master" (stats.WeaponMaster, (fun b -> { stats with WeaponMaster = b } |> update))
-        editDamage "Damage" stats update
+        EditDamage "Damage" stats update
         editDamageType "Damage type" (Some "Other") (stats.DamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with DamageType = v } |> update))
         editRollSpec "Followup damage" (stats.FollowupDamage, (fun r -> { stats with FollowupDamage = r } |> update))
         if stats.FollowupDamage.IsSome then
