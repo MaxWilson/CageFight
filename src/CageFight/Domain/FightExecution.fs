@@ -80,13 +80,15 @@ module CombatEvents =
                     })
         let takeDamage (id: CombatantId) amount conditions =
             updateCombatant id (fun c ->
+                let goingBerserk = conditions |> List.contains Berserk
+                // if going berserk, make sure to remove Stunned from conditions
                 let mods' = (c.statusMods @ conditions) |> List.distinct
                 { c with
                     injuryTaken = c.injuryTaken + amount
                     shockPenalty =
                         if c.stats.SupernaturalDurability || c.stats.HighPainThreshold || (mods' |> List.contains Berserk) then 0
                         else (c.shockPenalty - amount) |> max -4
-                    statusMods = mods'
+                    statusMods = if goingBerserk then mods' |> List.filter ((<>) Stunned) else mods'
                     })
         match msg with
         | Hit (ids, defense, injury, statusImpact, rollDetails) ->
@@ -213,13 +215,12 @@ let failedDeathcheck (attempt: int -> bool) (fullHP: int) priorHP newHP =
 let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
     // HIGH speed and DX goes first so we use the negative of those values
     for c in cqrs.State.combatants.Values |> Seq.sortBy (fun c -> -c.stats.Speed_, -c.stats.DX_, c.stats.name, c.number) |> Seq.map (fun c -> c.Id) do
-        let d = RollSpec.create(3,6)
-        let attackRoll = d.roll()
+        let roll3d6 = RollSpec.create(3,6)
         let mutable msg = ""
         let recordMsg txt =
             if msg = "" then msg <- txt else msg <- $"{msg}; {txt}"
         let detailedAttempt label targetNumber =
-            let roll = d.roll()
+            let roll = roll3d6.roll()
             match successTest targetNumber roll with
             | CritSuccess _ as success ->
                 recordMsg $"{label} critically succeeded (target {targetNumber}, rolled {roll})"
@@ -237,9 +238,9 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
             match detailedAttempt label targetNumber with
             | (CritSuccess _ | Success _) as success -> true
             | (CritFail _ | Fail _) -> false
-        let checkGoesUnconscious (self: Combatant) incomingDamage =
+        let checkGoesUnconscious (self: Combatant, isBerserk) incomingDamage =
             let penalty = (self.CurrentHP_ - incomingDamage) / self.stats.HP_
-            attempt "Stay conscious" (self.stats.HT_ + penalty) |> not
+            attempt "Stay conscious" (self.stats.HT_ + penalty + (if isBerserk then +4 else 0)) |> not
         let mutable doneEarly = false
         let attacker = cqrs.State.combatants[c]
         if attacker.statusMods |> List.exists (function Dead | Unconscious -> true | _ -> false) |> not then
@@ -249,14 +250,13 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                 else
                     Info(attacker.Id, "does nothing", msg)
                 |> cqrs.Execute
-            elif attacker.CurrentHP_ <= 0 && (not attacker.stats.SupernaturalDurability) && checkGoesUnconscious attacker 0 then
+            elif attacker.CurrentHP_ <= 0 && (not attacker.stats.SupernaturalDurability) && checkGoesUnconscious (attacker, attacker.statusMods |> List.contains Berserk) 0 then
                 FallUnconscious(attacker.Id, msg)
                 |> cqrs.Execute
             elif attacker.statusMods |> List.exists ((=) Prone) then
                 StandUp(attacker.Id, msg)
                 |> cqrs.Execute
             else
-
                 for m in 1..(1 + attacker.stats.AlteredTimeRate_) do
                     let totalAttacks, rapidStrikes = (if attacker.stats.UseRapidStrike then 2 + attacker.stats.ExtraAttack_, 2 else 1 + attacker.stats.ExtraAttack_, 0)
                     for n in 1..totalAttacks do
@@ -318,8 +318,17 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                                 recordMsg $"Damage {attacker.stats.Damage_} ({dmg} {defaultArg attacker.stats.DamageType Other}) - DR {victim.stats.DR_} = {injury} injury"
                                                 injury
                                         let mutable newConditions = []
-                                        if (float injury > float victim.stats.HP_ / 4. && attacker.statusMods |> List.contains Berserk |> not) then
-                                            ()
+                                        let mutable berserk = victim.statusMods |> List.contains Berserk
+                                        match victim.stats.Berserk with
+                                        | Some berserkLevel when (float injury > float victim.stats.HP_ / 4. && (victim.statusMods |> List.contains Berserk |> not)) ->
+                                            let target =
+                                                match berserkLevel with Mild -> 15 | Moderate -> 12 | Serious -> 9 | Severe -> 6 | Always -> 0
+                                            // we deliberately don't use attempt here because we don't want to clutter the log with self-control rolls
+                                            if (roll3d6.roll() <= target = false) then
+                                                recordMsg $"{victim.personalName} goes berserk"
+                                                newConditions <- newConditions@[Berserk]
+                                                berserk <- true
+                                        | _ -> ()
                                         let hp' = victim.CurrentHP_ - injury
                                         // -5 x max HP is auto-death
                                         let autodeathThreshold = victim.stats.HP_ * (if victim.stats.UnnaturallyFragile then -1 else -5)
@@ -327,13 +336,13 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                             recordMsg $"Auto-death occurs at {autodeathThreshold} HP"
                                             newConditions <- [Dead]
                                         // check for death if crossing a HP threshold, -1 x max HP or below
-                                        elif failedDeathcheck (fun threshold -> attempt $"Deathcheck at {threshold} HP" victim.stats.HT_)
+                                        elif failedDeathcheck (fun threshold -> attempt $"Deathcheck at {threshold} HP" (victim.stats.HT_ + if berserk then +4 else 0))
                                                 victim.stats.HP_ victim.CurrentHP_ hp' then
                                             newConditions <- [Dead]
                                         // check for unconsciousness on dropping to zero HP
-                                        elif victim.CurrentHP_ > 0 && hp' <= 0 && (not victim.stats.SupernaturalDurability) && checkGoesUnconscious victim injury then
+                                        elif victim.CurrentHP_ > 0 && hp' <= 0 && (not victim.stats.SupernaturalDurability) && checkGoesUnconscious (victim, berserk) injury then
                                             newConditions <- [Unconscious]
-                                        elif injury > (victim.stats.HP_ + 1) / 2 && (not victim.stats.SupernaturalDurability)
+                                        elif injury > (victim.stats.HP_ + 1) / 2 && not (victim.stats.SupernaturalDurability || berserk)
                                                 && (attempt "Knockdown check" (victim.stats.HT_ +
                                                     if victim.stats.HighPainThreshold then +3 else 0) |> not) then
                                             newConditions <- [Stunned; Prone]

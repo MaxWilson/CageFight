@@ -26,6 +26,14 @@ module Core =
         else ticksToDice ((st+10+1)*4/10) bonusOrPenalty
     type InjuryTolerance = Unliving | Homogeneous | Diffuse
     type SelfControlLevel = Mild | Moderate | Serious | Severe | Always
+        with
+        static member toDescription =
+            function
+            | Mild -> "Mild (15)"
+            | Moderate -> "Moderate (12)"
+            | Serious -> "Serious (9)"
+            | Severe -> "Severe (6)"
+            | Always -> "Always"
     type Creature = {
         name: string
         pluralName: string prop
