@@ -655,23 +655,6 @@ let view (model: Model) dispatch =
                 ]
             ]
 
-module Url =
-    module Parse =
-        open Browser.Types
-        open Packrat
-        let locationParser (rootActivePattern: ParseRule<_>) (loc: Location) =
-            let (|Root|_|) = rootActivePattern
-            match ParseArgs.Init loc.hash with
-            | Str "#" (Root(v, End)) -> v
-            | _ -> []
-
-    let parse loc =
-        // let parsed = Parse.page loc
-        // parsed |> List.map Cmd.ofMsg
-        () // this goes to init ()
-    let update msg model = // update via URL navigation (from parse output), as opposed to directly via dispatch
-        model, Cmd.Empty
-
 open Elmish
 open Elmish.Navigation
 open Elmish.HMR
@@ -687,6 +670,5 @@ Program.mkProgram init update view
                         // Browser.Dom.window.alert ("Unhandled Exception: " + msg.ToString())
             React.createDisposable (fun () -> Browser.Dom.window.onerror <- ignore)
         ])
-|> Program.toNavigable Url.parse Url.update
 |> Program.withReactBatched "feliz-app"
 |> Program.run
