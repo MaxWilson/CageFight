@@ -67,7 +67,7 @@ let update msg model =
     | Fight v -> { model with execution = v }, Cmd.Empty
 
 let init () =
-    let dev = true
+    let dev = false
     let updateWithDefaults catalog =
         if dev then
             // during development, we want to be able to overwrite user defaults so they get e.g. Berserk minotaurs when we add a Berserk field
