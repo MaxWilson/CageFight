@@ -451,7 +451,7 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
         ]
 
 [<ReactComponent>]
-let executeButton model dispatch =
+let ExecuteButton model dispatch =
     React.useListener.onKeyDown(fun ev ->
         if ev.key = "Enter" && ev.ctrlKey then ev.preventDefault(); beginFights model dispatch
         )
@@ -633,7 +633,7 @@ let view (model: Model) dispatch =
                                     ]
                             ]
                         ]
-                    executeButton model dispatch
+                    ExecuteButton model dispatch
                     match model.execution with
                     | NotStarted | InProgress -> ()
                     | Completed (setup, result) ->
