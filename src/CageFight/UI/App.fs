@@ -7,6 +7,7 @@ open Feliz
 open Domain
 open Domain.Random
 open Domain.Random.Parser
+open Feliz.UseListener
 // make sure errors are not silent: show them as Alerts (ugly but better than nothing for now)
 open Fable.Core.JsInterop
 open Fable.Core
@@ -305,8 +306,14 @@ let [<ReactComponent>] EditView (name: string) (db: MonsterDatabase) dispatch =
         editNumber "Extra Parries" stats.ExtraParry_ (stats.ExtraParry, (fun n -> { stats with ExtraParry = n } |> update))
         editNumber "Altered Time Rate" stats.AlteredTimeRate_ (stats.AlteredTimeRate, (fun n -> { stats with AlteredTimeRate = n } |> update))
         class' "buttons" Html.div [
-            Html.button [prop.text "Cancel"; prop.onClick (fun _ -> dispatch (SetPage Home))]
-            Html.button [prop.text "OK"; prop.onClick (fun _ -> dispatch (Upsert stats); dispatch (SetPage Home)); prop.disabled (stats.name |> System.String.IsNullOrWhiteSpace)]
+            let cancel _ = dispatch (SetPage Home)
+            let save _ = dispatch (Upsert stats); dispatch (SetPage Home)
+            Html.button [prop.text "Cancel"; prop.onClick cancel]
+            Html.button [prop.text "OK"; prop.onClick save; prop.disabled (stats.name |> System.String.IsNullOrWhiteSpace)]
+            React.useListener.onKeyDown(fun ev ->
+                if ev.key = "Escape" then ev.preventDefault(); cancel()
+                elif ev.key = "s" && ev.ctrlKey then ev.preventDefault(); save()
+                )
             ]
         ]
 
@@ -386,6 +393,12 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
             Html.button [prop.text "<"; prop.onClick (changeIndex -1)]
             Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
             Html.button [prop.text ">>"; prop.onClick nextRound]
+            React.useListener.onKeyDown(fun ev ->
+                if ev.key = ">" then nextRound()
+                elif ev.key = "<" then priorRound()
+                elif ev.key = "ArrowDown" then changeIndex +1 ()
+                elif ev.key = "ArrowUp" then changeIndex -1 ()
+                )
             checkbox Html.span "Show rolls" (showRolls, setShowRolls)
             ]
         class' "logEntries" Html.div [
@@ -436,6 +449,13 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
             ]
         ]
 
+[<ReactComponent>]
+let executeButton model dispatch =
+    React.useListener.onKeyDown(fun ev ->
+        if ev.key = "Enter" && ev.ctrlKey then ev.preventDefault(); beginFights model dispatch
+        )
+    Html.button [prop.text "Execute"; prop.onClick (thunk2 beginFights model dispatch)]
+
 let view (model: Model) dispatch =
     match model.error, model.page with
     | Some error, _ ->
@@ -465,6 +485,7 @@ let view (model: Model) dispatch =
                     Html.h1 "Shining Sword Cage Fight!"
                     Html.h3 "For Dungeon Fantasy RPG and GURPS"
                     ]
+
                 class' "main" Html.div [
                     class' "fightSetup" Html.div [
                         let editLink (quantity: int option) (name: string) =
@@ -611,7 +632,7 @@ let view (model: Model) dispatch =
                                     ]
                             ]
                         ]
-                    Html.button [prop.text "Execute"; prop.onClick (thunk2 beginFights model dispatch)]
+                    executeButton model dispatch
                     match model.execution with
                     | NotStarted | InProgress -> ()
                     | Completed (setup, result) ->

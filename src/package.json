@@ -14,6 +14,9 @@
     },
     "dependencies": {
         "date-fns": "^2.29.3",
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "use-sync-external-store": "^1.2.0",
         "vite": "^4.1.1"
     },
     "devDependencies": {
@@ -22,13 +25,10 @@
         "esm": "^3.2.25",
         "graceful-fs": "^4.2.10",
         "mocha": "^10.2.0",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
         "react-drag-drop-container": "^6.1.1",
         "react-konva": "^18.2.4",
         "react-refresh": "^0.14.0",
         "sass": "^1.58.0",
-        "terser": "^5.16.3",
-        "use-sync-external-store": "^1.2.0"
+        "terser": "^5.16.3"
     }
 }
