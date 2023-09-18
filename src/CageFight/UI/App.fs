@@ -308,11 +308,12 @@ let [<ReactComponent>] EditView (name: string) (db: MonsterDatabase) dispatch =
         class' "buttons" Html.div [
             let cancel _ = dispatch (SetPage Home)
             let save _ = dispatch (Upsert stats); dispatch (SetPage Home)
+            let noSave = (stats.name |> System.String.IsNullOrWhiteSpace)
             Html.button [prop.text "Cancel"; prop.onClick cancel]
-            Html.button [prop.text "OK"; prop.onClick save; prop.disabled (stats.name |> System.String.IsNullOrWhiteSpace)]
+            Html.button [prop.text "OK"; prop.onClick save; prop.disabled noSave]
             React.useListener.onKeyDown(fun ev ->
                 if ev.key = "Escape" then ev.preventDefault(); cancel()
-                elif ev.key = "s" && ev.ctrlKey then ev.preventDefault(); save()
+                elif ev.key = "s" && ev.ctrlKey && not noSave then ev.preventDefault(); save()
                 )
             ]
         ]
