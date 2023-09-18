@@ -318,7 +318,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                             | Some r when penetratingDmg > 0 ->
                                                 let followup, followupType = (r.roll() |> damageCap attacker.stats.FollowupDamageType, attacker.stats.FollowupDamageType)
                                                 let injury = injury + toInjury (followup, followupType)
-                                                recordMsg $"Damage {attacker.stats.Damage_} + {r} ({dmg} {defaultArg attacker.stats.DamageType Other}, {followup} {followupType}) - DR {victim.stats.DR_} = {injury} injury"
+                                                recordMsg $"Damage {attacker.stats.Damage_} + {r} ({dmg} {defaultArg attacker.stats.DamageType Other}, {followup} {defaultArg followupType Other}) - DR {victim.stats.DR_} = {injury} injury"
                                                 injury
                                             | _ ->
                                                 recordMsg $"Damage {attacker.stats.Damage_} ({dmg} {defaultArg attacker.stats.DamageType Other}) - DR {victim.stats.DR_} = {injury} injury"
