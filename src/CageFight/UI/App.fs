@@ -396,8 +396,8 @@ let ViewCombat (setup, combatLog: CombatLog) dispatch =
             Html.button [prop.text ">"; prop.onClick (changeIndex +1)]
             Html.button [prop.text ">>"; prop.onClick nextRound]
             React.useListener.onKeyDown(fun ev ->
-                if ev.key = ">" then nextRound()
-                elif ev.key = "<" then priorRound()
+                if ev.key = ">" || ev.key = "ArrowRight" then nextRound()
+                elif ev.key = "<" || ev.key = "ArrowLeft" then priorRound()
                 elif ev.key = "ArrowDown" then changeIndex +1 ()
                 elif ev.key = "ArrowUp" then changeIndex -1 ()
                 )
