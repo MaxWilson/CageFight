@@ -18,6 +18,10 @@ But! you can just run a cage fight with a bunch of orcs and measure a monster's 
 
 Therefore I present https://maxwilson.github.io/CageFight/
 
+# Undocumented hotkeys
+
+It's not documented inside the app, but if you're on a PC you can use '<' and '>' and left/right/up/down arrow keys to navigate the fight log, and on the monster edit screen Ctrl+S and Escape work for OK and Cancel respectively.
+
 # Attributions
 
 Sword icon created by pongsakornRed - Flaticon. https://www.flaticon.com/free-icons/sword
