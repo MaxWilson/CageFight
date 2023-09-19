@@ -163,28 +163,29 @@ let prioritizeTargets (combat: Combat) (attacker: Combatant) =
 let tryFindTarget (combat: Combat) (attacker: Combatant) =
     prioritizeTargets combat attacker |> Seq.tryHead
 
-let chooseDefense (attacker: CombatantId) (victim: Combatant) =
+let chooseDefense (attacker: Combatant) (victim: Combatant) =
+    let attackerId = attacker.Id
     let canRetreat =
         (not <| victim.isAny [Dead; Unconscious; Stunned] )
         && (
         match victim.retreatUsed with
-        | Some id when id = attacker -> true
+        | Some id when id = attackerId -> true
         | None -> true
         | _ -> false)
     let (|Parry|_|) = function
-        | Some parry ->
+        | Some parry when not attacker.stats.CannotBeParried ->
             let parry = (parry - (match victim.stats.WeaponMaster, victim.stats.FencingParry with | true, true -> 1 | true, false | false, true -> 2 | otherwise -> 4) * (victim.parriesUsed / (1 + victim.stats.ExtraParry_)))
-            Some(if canRetreat then (if victim.stats.FencingParry then 3 else 1) + parry, Some attacker else parry, None)
-        | None -> None
+            Some(if canRetreat then (if victim.stats.FencingParry then 3 else 1) + parry, Some attackerId else parry, None)
+        | _ -> None
     let (|Block|_|) = function
         | Some block when victim.blockUsed = false ->
-            Some(if canRetreat then 1 + block, Some attacker else block, None)
+            Some(if canRetreat then 1 + block, Some attackerId else block, None)
         | _ -> None
     let dodge, retreat =
         let dodge = if (float victim.CurrentHP_) >= (float victim.stats.HP_ / 3.)
                     then victim.stats.Dodge_
                     else victim.stats.Dodge_ / 2
-        if canRetreat then 3 + dodge, Some attacker else dodge, None
+        if canRetreat then 3 + dodge, Some attackerId else dodge, None
     let target, defense =
         match victim.stats.Parry, victim.stats.Block with
         | Parry (parry, retreat), Block (block, _) when parry >= block && parry >= dodge ->
@@ -286,7 +287,7 @@ let fightOneRound (cqrs: CQRS.CQRS<_, Combat>) =
                                     | n -> n, 0
                                 match detailedAttempt "Attack" skill with
                                 | (Success _ | CritSuccess _) as success ->
-                                    let defenseTarget, defense = chooseDefense attacker.Id victim
+                                    let defenseTarget, defense = chooseDefense attacker victim
                                     let defenseLabel =
                                         (match defense.defense with Parry -> "Parry" | Block -> "Block" | Dodge -> "Dodge")
                                         + (if defense.targetRetreated then " and retreat" else "")

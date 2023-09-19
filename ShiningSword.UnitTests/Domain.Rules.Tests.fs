@@ -25,11 +25,12 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ baseDamage 100 = (RollSpec.create(11,6), RollSpec.create(13,6)) @>
 
     testCase "Spot check defense choice" <| fun () ->
-        let previousAttacker = (2, "Ogre 1")
-        let attacker = (2, "Ogre 2")
+        let previousAttacker = Combatant.fresh(2, "Ogre 1", 1, Creature.create "Ogre 1")
+        let attacker = Combatant.fresh(2, "Ogre 2", 2, Creature.create "Ogre 2")
+        let gunman = Combatant.fresh(2, "Gunman", 3, { Creature.create "Gunman" with CannotBeParried = true })
         let create dodge parry block retreatUsed =
             let stats = { Creature.create("test") with Dodge = Some dodge; Parry = Some parry; Block = Some block }
-            { Combatant.fresh(1, "test1", 1, stats) with retreatUsed = if retreatUsed then Some previousAttacker else None }
+            { Combatant.fresh(1, "test1", 1, stats) with retreatUsed = if retreatUsed then Some previousAttacker.Id else None }
         let chooseDefenseWith f dodge parry block retreat parriesUsed =
             let combatant = create dodge parry block retreat
             let combatant = { combatant with parriesUsed = parriesUsed; stats = f combatant.stats }
@@ -44,11 +45,15 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         let chooseDefenseWithPriorRetreat dodge parry block previousRetreat =
             let combatant = { create dodge parry block false with retreatUsed = Some previousRetreat }
             chooseDefense attacker combatant |> DefenseResult.create
+        let chooseDefenseFromGunman dodge parry block retreat =
+            let combatant = create dodge parry block retreat
+            chooseDefense gunman combatant |> DefenseResult.create
         let chooseDefense dodge parry block retreat =
             let combatant = create dodge parry block retreat
             chooseDefense attacker combatant |> DefenseResult.create
         verify <@ chooseDefense 10 0 0 true = (10, { defense = Dodge; targetRetreated = false })  @>
         verify <@ chooseDefense 10 13 9 true = (13, { defense = Parry; targetRetreated = false }) @>
+        verify <@ chooseDefenseFromGunman 10 13 9 true = (10, { defense = Dodge; targetRetreated = false }) @>
         verify <@ chooseDefense 10 9 14 true = (14, { defense = Block; targetRetreated = false }) @>
         verify <@ chooseDefense 10 10 10 false = (13, { defense = Dodge; targetRetreated = true })  @>
         verify <@ chooseDefense 10 13 9 false = (14, { defense = Parry; targetRetreated = true }) @>
@@ -79,8 +84,8 @@ let Tests = testLabel "Unit" <| testList "Rules" [
         verify <@ chooseDefenseWeaponMasterFencing 10 17 0 true 0 3 = (14, { defense = Parry; targetRetreated = false })  @>
         verify <@ chooseDefenseWeaponMasterFencing 10 17 0 false 0 3 = (17, { defense = Parry; targetRetreated = true })  @>
         // prove that retreat works across multiple defenses
-        verify <@ chooseDefenseWithPriorRetreat 10 0 0 previousAttacker = (10, { defense = Dodge; targetRetreated = false })  @>
-        verify <@ chooseDefenseWithPriorRetreat 10 0 0 attacker = (13, { defense = Dodge; targetRetreated = true })  @>
+        verify <@ chooseDefenseWithPriorRetreat 10 0 0 previousAttacker.Id = (10, { defense = Dodge; targetRetreated = false })  @>
+        verify <@ chooseDefenseWithPriorRetreat 10 0 0 attacker.Id = (13, { defense = Dodge; targetRetreated = true })  @>
 
     testCase "Spot check target prioritization" <| fun () ->
         let attacker =

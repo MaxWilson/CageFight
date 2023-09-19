@@ -81,6 +81,7 @@ module Core =
         InjuryTolerance: InjuryTolerance prop
         AlteredTimeRate: int prop
         UseRapidStrike: bool
+        CannotBeParried: bool
         }
         with
         static member create (name: string, ?pluralName) =
@@ -112,6 +113,7 @@ module Core =
               InjuryTolerance = None
               AlteredTimeRate = None
               UseRapidStrike = false
+              CannotBeParried = false
               }
         // "_" means "defaulted" in the sense that it's the value that will be used if the property is not set.
         member this.PluralName_ = defaultArg this.pluralName (this.name + "s")
@@ -195,6 +197,7 @@ module Core =
                 show "Supernatural Durability" this.SupernaturalDurability
                 show "High Pain Threshold" this.HighPainThreshold
                 show "Rapid Strike" this.UseRapidStrike
+                show "Cannot Be Parried" this.CannotBeParried
                 selfControl "Berserk" this.Berserk
                 match this.InjuryTolerance with None -> "" | Some it -> it.ToString()
 
@@ -275,6 +278,7 @@ module Parser =
             -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType; FollowupDamage = Some followupDamage; FollowupDamageType = followupDamageType }), rest)
         | DamageOverall((damage, damageType), rest) -> Some((fun c -> { c with Damage = Some damage; DamageType = damageType }), rest)
         | OWSStr "Rapid Strike" rest -> Some((fun c -> { c with UseRapidStrike = true }), rest)
+        | OWSStr "Cannot Be Parried" rest -> Some((fun c -> { c with CannotBeParried = true }), rest)
         | OWSStr "Extra Attack" (Int (v, rest)) -> Some((fun c -> { c with ExtraAttack = Some v }), rest)
         | OWSStr "Extra Attack" rest -> Some((fun c -> { c with ExtraAttack = Some 1 }), rest)
         | OWSStr "Extra Parry" (Int (v, rest)) -> Some((fun c -> { c with ExtraParry = Some v }), rest)
@@ -316,12 +320,13 @@ module Defaults =
             parse "Orc: ST 12 DX 11 IQ 9 HT 11 DR 2 HP 14 Dodge 7 Parry 9 Block 9 Skill 13 sw+1 cut"
             parse "Ogre: ST 20 DX 11 IQ 7 HT 13 High Pain Threshold Skill 16 3d+7 cr Parry 11 DR 3"
             parse "Slugbeast: ST 16 IQ 2 Skill 12 1d+2 Homogeneous"
-            parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 1d+3 imp DR 2 Speed 8 Parry 10 Block 10 Unliving Unnatural"
+            parse "Skeleton: ST 11 DX 13 IQ 8 HT 12 Skill 14 thr+3 imp DR 2 Speed 8 Parry 10 Block 10 Unliving Unnatural"
             parse "Stone Golem: ST 20 DX 11 IQ 8 HT 14 HP 30 HPT Parry 9 DR 4 Homogeneous Skill 13 sw+4 cut Unnatural"
             parse "Rock Mite: ST 12 HT 13 Speed 5.00 DR 5 Homogeneous Skill 10 1d-1 cut + followup 2d burn"
             parse "Inigo Montoya: ST 13 DX 16 IQ 11 HT 12 Speed 8.5 Dodge 12 Parry 17F DR 1 Weapon Master Skill 22 thr+2 imp Extra Attack 1 Rapid Strike"
             parse "Cave Bear: ST 23 DX 11 IQ 4 HT 13 DR 2 Parry 9 Skill 13 2d thr+1 cut Berserk 9"
             parse "Watcher: ST 12 DX 18 HT 12 Speed 10 Dodge 14 Parry 13 Skill 18 sw cut Extra Parry 3 Extra Attack 3 Altered Time Rate"
+            parse "Mafia Gunman [Mafia Gunmen]: ST 10 DX 12 HT 11 Skill 12 Cannot Be Parried 2d+2 pi"
             ]
         |> List.map(fun c -> c.name, c)
         |> Map.ofList

@@ -302,6 +302,7 @@ let [<ReactComponent>] EditView (name: string) (db: MonsterDatabase) dispatch =
             editDamageType "Followup type" None (stats.FollowupDamageType, [Crushing; Cutting; Piercing; Impaling; Burning; Other], (fun v -> { stats with FollowupDamageType = v } |> update))
         else Html.div []
         editBool "Use Rapid Strike" (stats.UseRapidStrike, (fun b -> { stats with UseRapidStrike = b } |> update))
+        editBool "Cannot Be Parried" (stats.CannotBeParried, (fun b -> { stats with CannotBeParried = b } |> update))
         editNumber "Extra Attacks" stats.ExtraAttack_ (stats.ExtraAttack, (fun n -> { stats with ExtraAttack = n } |> update))
         editNumber "Extra Parries" stats.ExtraParry_ (stats.ExtraParry, (fun n -> { stats with ExtraParry = n } |> update))
         editNumber "Altered Time Rate" stats.AlteredTimeRate_ (stats.AlteredTimeRate, (fun n -> { stats with AlteredTimeRate = n } |> update))
