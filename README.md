@@ -25,3 +25,5 @@ It's not documented inside the app, but if you're on a PC you can use '<' and '>
 # Attributions
 
 Sword icon created by pongsakornRed - Flaticon. https://www.flaticon.com/free-icons/sword
+Sword icons created by Freepik - Flaticon. https://www.flaticon.com/free-icons/sword
+Shield icons created by Freepik - Flaticon. https://www.flaticon.com/free-icons/sword
